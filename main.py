@@ -8,13 +8,19 @@ from src.data.loaders import (
     load_irc_data,
 )
 from src.processing.distribution_adjuster import adjust_age_distribution
+from model import markov
 import numpy as np
+import typer
 import asyncio
 
 logger = get_logger()
 
 
-async def run(execute: bool):
+app = typer.Typer()
+
+
+@app.command(help="Runs loaders and scarpers, then clean and store the results.")
+async def process(execute: bool):
     if execute:
         # Loading & Cleaning Amarnameh files
         (df_agg_1400, df_agg_1399), df_recombinant_1400 = process_amarnameh()
@@ -49,13 +55,10 @@ async def run(execute: bool):
         return False
 
 
-async def develop():
-    logger.info("Running under development functions")
-    logger.info("Ended")
+@app.command(help="Runs markov model simulation.")
+def simulate():
+    markov.run()
 
 
 if __name__ == "__main__":
-    # Application startup
-    launched = asyncio.run(run(False))
-    if not launched:
-        asyncio.run(develop())
+    app()

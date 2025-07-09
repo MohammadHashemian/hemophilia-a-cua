@@ -1,0 +1,10 @@
+states,alive_wo_arthropathy,alive_w_severe_arthropathy,alive_w_arthropathy,extra_articular_bleeding,articular_bleeding,life_threating_bleeding,surgery_or_injury_or_infection,dies_from_bleeding,developing_inhibiter
+alive_wo_arthropathy,,,,,,,,,
+alive_w_severe_arthropathy,,,,,,,,,
+alive_w_arthropathy,,,,,,,,,
+extra_articular_bleeding,,,,,,,,,
+articular_bleeding,,,,,,,,,
+life_threating_bleeding,,,,,,,,,
+surgery_or_injury_or_infection,,,,,,,,,
+dies_from_bleeding,,,,,,,,,
+developing_inhibiter,,,,,,,,,
