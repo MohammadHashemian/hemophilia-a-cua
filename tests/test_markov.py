@@ -1,4 +1,4 @@
-from markov import MarkovChain
+from hemophilia.model.markov import MarkovChain
 
 
 # Example Usage:

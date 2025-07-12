@@ -4,17 +4,16 @@ from src.data.loaders import (
     load_global_hemophilia_data,
     process_amarnameh,
     merge_and_save,
-    PROJECT_ROOT,
     load_irc_data,
 )
 from src.processing.distribution_adjuster import adjust_age_distribution
-from model import markov
+from model import simulation
+from pathlib import Path
 import numpy as np
 import typer
-import asyncio
 
+PROJECT_ROOT = Path(__file__).parents[0]
 logger = get_logger()
-
 
 app = typer.Typer()
 
@@ -56,8 +55,8 @@ async def process(execute: bool):
 
 
 @app.command(help="Runs markov model simulation.")
-def simulate():
-    markov.run()
+def markov():
+    simulation.run()
 
 
 if __name__ == "__main__":
