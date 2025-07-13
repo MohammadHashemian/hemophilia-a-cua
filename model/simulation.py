@@ -1,12 +1,11 @@
-from enum import Enum
-from typing import Literal
 from pathlib import Path
-import pandas as pd
-import numpy as np
-import math
 from model.markov import MarkovChain
+from model.schemas import Regimes, Status, Treatment
 from src.utils.logger import get_logger
 from src.data.loaders import PROJECT_ROOT
+from src.utils.utils import probability_at_least_one_event, probability_no_events
+import pandas as pd
+import numpy as np
 
 # Initialize logger for tracking operations and debugging
 logger = get_logger()
@@ -17,8 +16,8 @@ NUMBER_OF_CYCLES = 73 * 52  # Total weeks in 73 years for Markov chain cycles
 ON_DEMAND_ANNUAL_ABR = 44  # Annual bleeding rate for on-demand treatment
 ON_DEMAND_ANNUAL_AJBR = 34  # Annual joint bleeding rate for on-demand treatment
 PROPHYLAXIS_ANNUAL_ABR = 3.76  # Annual bleeding rate for prophylaxis
-PROPHYLAXIS_ANNUAL_AJBR = 3.76  # Annual joint bleeding rate
-# Life-threatening bleeding rates (derived from table: 1.5% intracranial + 1% neck/throat + 2% gastrointestinal = 4.5%)
+PROPHYLAXIS_ANNUAL_AJBR = 3.66  # Annual joint bleeding rate
+# Life-threatening bleeding rates
 LIFE_THREATENING_BLEEDING_FRACTION = 0.045
 ON_DEMAND_ANNUAL_ALBR = (
     ON_DEMAND_ANNUAL_ABR * LIFE_THREATENING_BLEEDING_FRACTION
@@ -26,7 +25,7 @@ ON_DEMAND_ANNUAL_ALBR = (
 PROPHYLAXIS_ANNUAL_ALBR = (
     PROPHYLAXIS_ANNUAL_ABR * LIFE_THREATENING_BLEEDING_FRACTION
 )  # 0.1692 events/year
-# Extra-articular bleeding rates (muscles + mucous membranes: 5% + 10% = 15%)
+# Extra-articular bleeding rates
 EXTRA_ARTICULAR_BLEEDING_FRACTION = 0.15
 ON_DEMAND_ANNUAL_EABR = (
     ON_DEMAND_ANNUAL_ABR * EXTRA_ARTICULAR_BLEEDING_FRACTION
@@ -34,115 +33,38 @@ ON_DEMAND_ANNUAL_EABR = (
 PROPHYLAXIS_ANNUAL_EABR = (
     PROPHYLAXIS_ANNUAL_ABR * EXTRA_ARTICULAR_BLEEDING_FRACTION
 )  # 0.564 events/year
+# ITI-specific bleeding rates (based on prophylaxis, reduced for severe bleeds)
+ITI_ANNUAL_ABR = PROPHYLAXIS_ANNUAL_ABR  # 3.76
+ITI_ANNUAL_AJBR = PROPHYLAXIS_ANNUAL_AJBR * 0.5  # 1.83
+ITI_ANNUAL_ALBR = PROPHYLAXIS_ANNUAL_ALBR * 0.5  # 0.0846
+ITI_ANNUAL_EABR = PROPHYLAXIS_ANNUAL_EABR  # 0.564
 # Cost parameters
 HUMAN_DERIVED_FACTOR_VIII_PER_UNIT_PRICE_RIAL = (
     58_000  # Cost per unit of factor VIII (Rial)
 )
-PROPHYLAXIS_FACTOR_DOSING_PER_INJECTION_PER_KG = 30  # Dose per injection (IU/kg)
-# Placeholder transition probabilities (to be replaced with clinical data)
-BLEED_RESOLUTION_PROB = (
-    0.9  # Probability of resolving minor/major bleeds to NO_BLEEDING
-)
+AVG_DOSE_PER_BLEED = 25.805  # Weighted average: 0.8*25 + 0.05*31.5 + 0.1*25 + 0.015*32 + 0.01*35 + 0.02*45
+# Placeholder transition probabilities
+BLEED_RESOLUTION_PROB = 0.9  # Probability of resolving minor/major bleeds
 CRITICAL_BLEED_RESOLUTION_PROB = 0.7  # Lower probability for critical bleeds
 ARTHROPATHY_PROGRESSION_PROB = 0.01  # Probability of developing/worsening arthropathy
 CRITICAL_BLEED_DEATH_PROB = 0.05  # Probability of death from critical bleeds
 COMPLICATION_PROB = 0.01  # Probability of complications (e.g., surgery)
+ITI_COMPLICATION_PROB = COMPLICATION_PROB * 0.5  # Reduced for ITI
 CHRONIC_ARTHROPATHY_STAY_PROB = 0.9  # Probability of staying in CHRONIC_ARTHROPATHY
 SEVERE_ARTHROPATHY_STAY_PROB = 0.95  # Probability of staying in SEVERE_ARTHROPATHY
-
-
-class Status(Enum):
-    """Enum representing possible health states for a hemophilia A patient."""
-
-    NO_BLEEDING = "alive_wo_arthropathy"
-    MINOR_BLEEDING = "extra_articular_bleeding"
-    MAJOR_BLEEDING = "articular_bleeding"
-    CRITICAL_BLEEDING = "life_threatening_bleeding"
-    SEVERE_ARTHROPATHY = "alive_w_severe_arthropathy"
-    CHRONIC_ARTHROPATHY = "alive_w_arthropathy"
-    COMPLICATION = "surgery_or_injury_or_infection"
-    DEATH = "dies_any_reason"
-    INHIBITOR = "developing_inhibitor"
-
-
-class State:
-    """Represents a health state with associated utility and cost."""
-
-    def __init__(self, status: Status, utility_score: float, costs: int):
-        self.status = status
-        self.utility = utility_score
-        self.costs = costs
-
-
-class Treatment:
-    """Defines a treatment regime with dosing and bleeding rates."""
-
-    def __init__(
-        self,
-        name: str,
-        dose: int,
-        frequency: int,
-        abr: float,
-        ajbr: float,
-        albr: float,
-        eabr: float,
-    ):
-        self.name = name
-        self.dose = dose  # Dose per injection (IU/kg)
-        self.frequency = frequency  # Injections per week
-        self.abr = abr  # Annual bleeding rate
-        self.ajbr = ajbr  # Annual joint bleeding rate
-        self.albr = albr  # Annual life-threatening bleeding rate
-        self.eabr = eabr  # Annual extra-articular bleeding rate
-
-
-class Regimes(Enum):
-    """Enum for treatment regimes."""
-
-    PROPHYLAXIS = "prophylaxis"
-    ON_DEMAND = "on-demand"
-
-
-def probability_at_least_one_event(
-    lambda_value: float, interval: Literal["weekly", "annual"]
-) -> float:
-    """
-    Calculate the probability of at least one event occurring in a given interval using a Poisson process.
-
-    Args:
-        lambda_value: Expected number of events (e.g., bleeding rate).
-        interval: Time interval for the calculation ("weekly" or "annual").
-
-    Returns:
-        Probability of at least one event occurring (e.g., 0.4795 for joint bleeds in on-demand).
-    """
-    if lambda_value < 0:
-        logger.warning(f"Negative lambda_value {lambda_value}, setting to 0")
-        lambda_value = 0
-    if interval == "annual":
-        lambda_value /= 52  # Convert annual rate to weekly for weekly cycles
-    return 1 - math.exp(-lambda_value)  # P(at least one) = 1 - P(none)
-
-
-def probability_no_events(
-    lambda_value: float, interval: Literal["weekly", "annual"]
-) -> float:
-    """
-    Calculate the probability of no events occurring in a given interval using a Poisson process.
-
-    Args:
-        lambda_value: Expected number of events (e.g., total bleeding rate).
-        interval: Time interval for the calculation ("weekly" or "annual").
-
-    Returns:
-        Probability of no events occurring (e.g., 0.4290 for on-demand no bleeds).
-    """
-    if lambda_value < 0:
-        logger.warning(f"Negative lambda_value {lambda_value}, setting to 0")
-        lambda_value = 0
-    if interval == "annual":
-        lambda_value /= 52  # Convert annual rate to weekly for weekly cycles
-    return math.exp(-lambda_value)  # P(none) = e^(-lambda)
+# Inhibitor development probabilities (weekly)
+ON_DEMAND_INHIBITOR_PROB = (
+    7.94e-5  # Weekly probability for 30% lifetime risk over 73 years
+)
+PROPHYLAXIS_INHIBITOR_PROB = (
+    4.29e-5  # Weekly probability for 15% lifetime risk over 73 years
+)
+# ITI parameters
+ITI_SUCCESS_PROB_6_MONTHS = 0.8  # 80% success rate over 6 months
+WEEKS_PER_6_MONTHS = 26
+ITI_WEEKLY_SUCCESS_PROB = (
+    1 - (1 - ITI_SUCCESS_PROB_6_MONTHS) ** (1 / WEEKS_PER_6_MONTHS)
+) * 0.5  # ~0.0303, scaled to reduce early transitions
 
 
 def initialize_treatments() -> dict[Regimes, Treatment]:
@@ -150,8 +72,19 @@ def initialize_treatments() -> dict[Regimes, Treatment]:
     return {
         Regimes.ON_DEMAND: Treatment(
             name=Regimes.ON_DEMAND.value,
-            dose=50,
-            frequency=3,
+            dose_joint=25,
+            dose_muscle=31.5,
+            dose_mucous=25,
+            dose_intracranial=32,
+            dose_neck_throat=35,
+            dose_gastro=45,
+            duration_joint=2,
+            duration_muscle=5,
+            duration_mucous=3,
+            duration_intracranial=21,
+            duration_neck_throat=14,
+            duration_gastro=11,
+            avg_dose_per_bleed=AVG_DOSE_PER_BLEED,
             abr=ON_DEMAND_ANNUAL_ABR,
             ajbr=ON_DEMAND_ANNUAL_AJBR,
             albr=ON_DEMAND_ANNUAL_ALBR,
@@ -159,8 +92,19 @@ def initialize_treatments() -> dict[Regimes, Treatment]:
         ),
         Regimes.PROPHYLAXIS: Treatment(
             name=Regimes.PROPHYLAXIS.value,
-            dose=35,
-            frequency=3,
+            dose_joint=25,  # Use high-dose for all bleeds
+            dose_muscle=31.5,
+            dose_mucous=25,
+            dose_intracranial=32,
+            dose_neck_throat=35,
+            dose_gastro=45,
+            duration_joint=2,
+            duration_muscle=5,
+            duration_mucous=3,
+            duration_intracranial=21,
+            duration_neck_throat=14,
+            duration_gastro=11,
+            avg_dose_per_bleed=AVG_DOSE_PER_BLEED,
             abr=PROPHYLAXIS_ANNUAL_ABR,
             ajbr=PROPHYLAXIS_ANNUAL_AJBR,
             albr=PROPHYLAXIS_ANNUAL_ALBR,
@@ -169,13 +113,16 @@ def initialize_treatments() -> dict[Regimes, Treatment]:
     }
 
 
-def initialize_transition_matrix(path: Path, regime: Regimes) -> pd.DataFrame:
+def initialize_transition_matrix(
+    path: Path, regime: Regimes, override: bool = True
+) -> pd.DataFrame:
     """
     Initialize or load a transition matrix for the given treatment regime and populate it with probabilities.
 
     Args:
         path: Path to the CSV file storing the transition matrix.
         regime: Treatment regime (ON_DEMAND or PROPHYLAXIS).
+        override: Whether to override the existing matrix if it exists.
 
     Returns:
         DataFrame containing the transition matrix with states as rows and columns.
@@ -185,12 +132,11 @@ def initialize_transition_matrix(path: Path, regime: Regimes) -> pd.DataFrame:
 
     # Initialize or load the transition matrix
     try:
-        if path.exists():
+        if path.exists() and not override:
             logger.info(
                 f"Loading transition matrix from: {path.relative_to(PROJECT_ROOT)}"
             )
             df = pd.read_csv(path)
-            # Check if 'states' is a column or the index
             if "states" in df.columns:
                 df.set_index("states", inplace=True)
             elif df.index.name != "states":
@@ -198,7 +144,6 @@ def initialize_transition_matrix(path: Path, regime: Regimes) -> pd.DataFrame:
                     "CSV index does not match 'states', reinitializing matrix."
                 )
                 df = pd.DataFrame(0.0, index=states, columns=states)
-            # Verify columns match expected states
             if not np.array_equal(df.columns, states):
                 logger.warning("Column mismatch detected, reinitializing matrix.")
                 df = pd.DataFrame(0.0, index=states, columns=states)
@@ -213,14 +158,20 @@ def initialize_transition_matrix(path: Path, regime: Regimes) -> pd.DataFrame:
         )
         df = pd.DataFrame(0.0, index=states, columns=states)
 
-    # Get treatment parameters
+    df.index.name = "states"
+
+    # Get treatment parameters and inhibitor probability
     treatments = initialize_treatments()
     treatment = treatments[regime]
+    inhibitor_prob = (
+        ON_DEMAND_INHIBITOR_PROB
+        if regime == Regimes.ON_DEMAND
+        else PROPHYLAXIS_INHIBITOR_PROB
+    )
 
     # Populate transition probabilities based on regime
     for state in states:
-        if state == Status.NO_BLEEDING.value:
-            # Transitions from NO_BLEEDING
+        if state == Status.NO_BLEEDING.value:  # alive_wo_arthropathy
             df.loc[state, Status.NO_BLEEDING.value] = probability_no_events(
                 treatment.abr, "annual"
             )
@@ -234,13 +185,11 @@ def initialize_transition_matrix(path: Path, regime: Regimes) -> pd.DataFrame:
                 probability_at_least_one_event(treatment.albr, "annual")
             )
             df.loc[state, Status.CHRONIC_ARTHROPATHY.value] = (
-                ARTHROPATHY_PROGRESSION_PROB  # Placeholder: joint bleeds may lead to arthropathy
+                ARTHROPATHY_PROGRESSION_PROB
             )
-        elif state == Status.MINOR_BLEEDING.value:
-            # Transitions from MINOR_BLEEDING
-            df.loc[state, Status.NO_BLEEDING.value] = (
-                BLEED_RESOLUTION_PROB  # Assume minor bleeds resolve quickly
-            )
+            df.loc[state, Status.INHIBITOR.value] = inhibitor_prob
+        elif state == Status.MINOR_BLEEDING.value:  # minor_bleeding
+            df.loc[state, Status.NO_BLEEDING.value] = BLEED_RESOLUTION_PROB
             df.loc[state, Status.MINOR_BLEEDING.value] = probability_at_least_one_event(
                 treatment.eabr, "annual"
             )
@@ -250,14 +199,10 @@ def initialize_transition_matrix(path: Path, regime: Regimes) -> pd.DataFrame:
             df.loc[state, Status.CRITICAL_BLEEDING.value] = (
                 probability_at_least_one_event(treatment.albr, "annual")
             )
-            df.loc[state, Status.COMPLICATION.value] = (
-                COMPLICATION_PROB  # Placeholder: minor bleeds may lead to complications
-            )
-        elif state == Status.MAJOR_BLEEDING.value:
-            # Transitions from MAJOR_BLEEDING
-            df.loc[state, Status.NO_BLEEDING.value] = (
-                BLEED_RESOLUTION_PROB  # Assume joint bleeds resolve with treatment
-            )
+            df.loc[state, Status.COMPLICATION.value] = COMPLICATION_PROB
+            df.loc[state, Status.INHIBITOR.value] = inhibitor_prob
+        elif state == Status.MAJOR_BLEEDING.value:  # articular_bleeding
+            df.loc[state, Status.NO_BLEEDING.value] = BLEED_RESOLUTION_PROB
             df.loc[state, Status.MINOR_BLEEDING.value] = probability_at_least_one_event(
                 treatment.eabr, "annual"
             )
@@ -268,16 +213,12 @@ def initialize_transition_matrix(path: Path, regime: Regimes) -> pd.DataFrame:
                 probability_at_least_one_event(treatment.albr, "annual")
             )
             df.loc[state, Status.CHRONIC_ARTHROPATHY.value] = (
-                ARTHROPATHY_PROGRESSION_PROB  # Joint bleeds cause arthropathy
+                ARTHROPATHY_PROGRESSION_PROB
             )
-            df.loc[state, Status.COMPLICATION.value] = (
-                COMPLICATION_PROB  # Placeholder: bleeds may lead to surgery
-            )
-        elif state == Status.CRITICAL_BLEEDING.value:
-            # Transitions from CRITICAL_BLEEDING
-            df.loc[state, Status.NO_BLEEDING.value] = (
-                CRITICAL_BLEED_RESOLUTION_PROB  # Lower resolution probability
-            )
+            df.loc[state, Status.COMPLICATION.value] = COMPLICATION_PROB
+            df.loc[state, Status.INHIBITOR.value] = inhibitor_prob
+        elif state == Status.CRITICAL_BLEEDING.value:  # surgery_or_injury_or_infection
+            df.loc[state, Status.NO_BLEEDING.value] = CRITICAL_BLEED_RESOLUTION_PROB
             df.loc[state, Status.MINOR_BLEEDING.value] = probability_at_least_one_event(
                 treatment.eabr, "annual"
             )
@@ -287,19 +228,15 @@ def initialize_transition_matrix(path: Path, regime: Regimes) -> pd.DataFrame:
             df.loc[state, Status.CRITICAL_BLEEDING.value] = (
                 probability_at_least_one_event(treatment.albr, "annual")
             )
-            df.loc[state, Status.DEATH.value] = (
-                CRITICAL_BLEED_DEATH_PROB  # Higher risk of death
-            )
-            df.loc[state, Status.COMPLICATION.value] = (
-                COMPLICATION_PROB  # Placeholder: critical bleeds may lead to complications
-            )
-        elif state == Status.CHRONIC_ARTHROPATHY.value:
-            # Transitions from CHRONIC_ARTHROPATHY
+            df.loc[state, Status.DEATH.value] = CRITICAL_BLEED_DEATH_PROB
+            df.loc[state, Status.COMPLICATION.value] = COMPLICATION_PROB
+            df.loc[state, Status.INHIBITOR.value] = inhibitor_prob
+        elif state == Status.CHRONIC_ARTHROPATHY.value:  # chronic_arthropathy
             df.loc[state, Status.CHRONIC_ARTHROPATHY.value] = (
-                CHRONIC_ARTHROPATHY_STAY_PROB  # Persistent condition
+                CHRONIC_ARTHROPATHY_STAY_PROB
             )
             df.loc[state, Status.SEVERE_ARTHROPATHY.value] = (
-                ARTHROPATHY_PROGRESSION_PROB  # Worsening to severe
+                ARTHROPATHY_PROGRESSION_PROB
             )
             df.loc[state, Status.MINOR_BLEEDING.value] = probability_at_least_one_event(
                 treatment.eabr, "annual"
@@ -310,13 +247,11 @@ def initialize_transition_matrix(path: Path, regime: Regimes) -> pd.DataFrame:
             df.loc[state, Status.CRITICAL_BLEEDING.value] = (
                 probability_at_least_one_event(treatment.albr, "annual")
             )
-            df.loc[state, Status.COMPLICATION.value] = (
-                COMPLICATION_PROB  # Placeholder: arthropathy may require surgery
-            )
-        elif state == Status.SEVERE_ARTHROPATHY.value:
-            # Transitions from SEVERE_ARTHROPATHY
+            df.loc[state, Status.COMPLICATION.value] = COMPLICATION_PROB
+            df.loc[state, Status.INHIBITOR.value] = inhibitor_prob
+        elif state == Status.SEVERE_ARTHROPATHY.value:  # severe_arthropathy
             df.loc[state, Status.SEVERE_ARTHROPATHY.value] = (
-                SEVERE_ARTHROPATHY_STAY_PROB  # Highly persistent
+                SEVERE_ARTHROPATHY_STAY_PROB
             )
             df.loc[state, Status.MINOR_BLEEDING.value] = probability_at_least_one_event(
                 treatment.eabr, "annual"
@@ -327,18 +262,24 @@ def initialize_transition_matrix(path: Path, regime: Regimes) -> pd.DataFrame:
             df.loc[state, Status.CRITICAL_BLEEDING.value] = (
                 probability_at_least_one_event(treatment.albr, "annual")
             )
-            df.loc[state, Status.COMPLICATION.value] = (
-                COMPLICATION_PROB  # Placeholder: severe arthropathy may require surgery
+            df.loc[state, Status.COMPLICATION.value] = COMPLICATION_PROB
+            df.loc[state, Status.INHIBITOR.value] = inhibitor_prob
+        elif state == Status.COMPLICATION.value or state == Status.DEATH.value:
+            # Absorbing states
+            df.loc[state, state] = 1.0
+        elif state == Status.INHIBITOR.value:  # inhibitor
+            df.loc[state, Status.NO_BLEEDING.value] = ITI_WEEKLY_SUCCESS_PROB
+            df.loc[state, Status.MINOR_BLEEDING.value] = probability_at_least_one_event(
+                ITI_ANNUAL_EABR, "annual"
             )
-        elif state in [
-            Status.COMPLICATION.value,
-            Status.DEATH.value,
-            Status.INHIBITOR.value,
-        ]:
-            # Placeholder for absorbing or complex states
-            df.loc[state, state] = (
-                1.0  # Assume absorbing for simplicity (e.g., DEATH stays in DEATH)
+            df.loc[state, Status.MAJOR_BLEEDING.value] = probability_at_least_one_event(
+                ITI_ANNUAL_AJBR, "annual"
             )
+            df.loc[state, Status.CRITICAL_BLEEDING.value] = (
+                probability_at_least_one_event(ITI_ANNUAL_ALBR, "annual")
+            )
+            df.loc[state, Status.COMPLICATION.value] = ITI_COMPLICATION_PROB
+            df.loc[state, Status.INHIBITOR.value] = 0.0  # Adjusted during normalization
 
     # Normalize probabilities to ensure row sums to 1
     for state in states:
@@ -371,8 +312,6 @@ def initialize_transition_matrix(path: Path, regime: Regimes) -> pd.DataFrame:
 def run():
     """
     Main function to set up and run the Markov chain simulation for hemophilia A.
-
-    Initializes treatment regimes and transition matrices, preparing for state transitions.
     """
     # Define paths for transition matrices
     od_matrix_path = PROJECT_ROOT / "data" / "processed" / "od_transition_matrix.csv"
@@ -381,17 +320,65 @@ def run():
     # Initialize treatments
     treatments = initialize_treatments()
 
-    # Initialize transition matrices for both regimes
-    od_matrix = initialize_transition_matrix(od_matrix_path, Regimes.ON_DEMAND)
-    pro_matrix = initialize_transition_matrix(pro_matrix_path, Regimes.PROPHYLAXIS)
+    # Define states from Status enum
+    states = [state.value for state in Status]
 
-    # Placeholder for Markov chain simulation
-    # TODO: Implement MarkovChain from model.markov using od_matrix and pro_matrix
-    logger.info("Transition matrices initialized. Ready for Markov chain simulation.")
+    # Initialize transition matrices for both regimes and convert to 2D NumPy arrays
+    od_matrix = initialize_transition_matrix(
+        od_matrix_path, Regimes.ON_DEMAND
+    ).to_numpy()
+    pro_matrix = initialize_transition_matrix(
+        pro_matrix_path, Regimes.PROPHYLAXIS
+    ).to_numpy()
 
-    # Example placeholder transition matrix (to be replaced with actual logic)
-    transition_matrix = np.array([[0.1, 0.9], [0.9, 0.1]])
-    logger.debug(f"Placeholder transition matrix: {transition_matrix}")
+    # Initialize initial state probabilities (all patients start in alive_wo_arthropathy)
+    initial_state_probs = np.zeros(len(states))
+    no_bleeding_idx = states.index(Status.NO_BLEEDING.value)
+    initial_state_probs[no_bleeding_idx] = 1.0
 
-    # Note: The MarkovChain class and further simulation logic need to be implemented
-    # to use the transition matrices for state transitions over NUMBER_OF_CYCLES.
+    # Create MarkovChain instances for both regimes
+    od_markov_chain = MarkovChain(
+        states=states,
+        transition_matrix=od_matrix.tolist(),
+        initial_state_probs=initial_state_probs.tolist(),
+        treatment=treatments[Regimes.ON_DEMAND],
+        price_per_unit=HUMAN_DERIVED_FACTOR_VIII_PER_UNIT_PRICE_RIAL,
+    )
+    pro_markov_chain = MarkovChain(
+        states=states,
+        transition_matrix=pro_matrix.tolist(),
+        initial_state_probs=initial_state_probs.tolist(),
+        treatment=treatments[Regimes.PROPHYLAXIS],
+        price_per_unit=HUMAN_DERIVED_FACTOR_VIII_PER_UNIT_PRICE_RIAL,
+    )
+
+    # Run simulation
+    logger.info("Starting Markov chain simulation with dose and cost calculations")
+    num_steps = NUMBER_OF_CYCLES
+    od_results = od_markov_chain.simulate(num_steps)
+    pro_results = pro_markov_chain.simulate(num_steps)
+
+    # Log summary statistics
+    total_dose_od = sum(od_results["weekly_doses"])
+    total_cost_od = sum(od_results["weekly_costs"])
+    total_dose_pro = sum(pro_results["weekly_doses"])
+    total_cost_pro = sum(pro_results["weekly_costs"])
+    logger.info(
+        f"Total factor VIII dose over {num_steps/52:.2f} years: "
+        f"On-demand = {total_dose_od:.2f} IU, Prophylaxis = {total_dose_pro:.2f} IU"
+    )
+    logger.info(
+        f"Total cost over {num_steps/52:.2f} years: "
+        f"On-demand = {total_cost_od:.2f} Rial, Prophylaxis = {total_cost_pro:.2f} Rial"
+    )
+
+    # TODO: Use FileHandler
+    # Log sample weekly results for debugging
+    for week in range(num_steps):
+        logger.debug(
+            f"Week {week}, Age {week/52:.2f} years, "
+            f"OD State: {od_results['state_path'][week]}, OD Dose: {od_results['weekly_doses'][week]} IU, "
+            f"OD Cost: {od_results['weekly_costs'][week]} Rial, "
+            f"PRO State: {pro_results['state_path'][week]}, PRO Dose: {pro_results['weekly_doses'][week]} IU, "
+            f"PRO Cost: {pro_results['weekly_costs'][week]} Rial"
+        )
