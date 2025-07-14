@@ -1,3 +1,3 @@
 TODO:
 
-- check out why table bleedings fractions does not some to 1
+- check out why table bleedings fractions does not sum to 1

@@ -1,4 +1,4 @@
-from src.utils.logger import get_logger
+from src.utils.logger import get_logger, suppress_matplotlib_debug
 from src.data.scarper import fetch_irc_factors
 from src.data.loaders import (
     load_global_hemophilia_data,
@@ -56,6 +56,7 @@ async def process(execute: bool):
 
 @app.command(help="Runs markov model simulation.")
 def markov():
+    suppress_matplotlib_debug()
     simulation.run()
 
 

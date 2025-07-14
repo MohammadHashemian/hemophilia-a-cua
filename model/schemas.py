@@ -1,9 +1,11 @@
 from dataclasses import dataclass
 from enum import Enum
 
+
 class Regimes(Enum):
     ON_DEMAND = "on_demand"
     PROPHYLAXIS = "prophylaxis"
+
 
 class Status(Enum):
     NO_BLEEDING = "alive_wo_arthropathy"
@@ -16,9 +18,11 @@ class Status(Enum):
     INHIBITOR = "inhibitor"
     DEATH = "death"
 
+
 @dataclass
 class Treatment:
     """Defines a treatment regime with dosing and bleeding rates."""
+
     name: str
     dose_joint: float  # Dose per injection for joints (IU/kg)
     dose_muscle: float  # Dose per injection for muscles (IU/kg)

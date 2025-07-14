@@ -14,6 +14,7 @@ class MarkovChain:
         initial_state_probs: List[float],
         treatment: Treatment,
         price_per_unit: float = 58_000,  # Cost per IU in Rial
+        regime: Regimes = Regimes.ON_DEMAND,
     ):
         """
         Initialize the Markov chain with states, transition matrix, initial probabilities, and treatment.
@@ -24,12 +25,15 @@ class MarkovChain:
             initial_state_probs: Initial state probability distribution.
             treatment: Treatment object containing dosing and bleeding rates.
             price_per_unit: Cost per unit of factor VIII (Rial/IU).
+            regime: Treatment regime (ON_DEMAND or PROPHYLAXIS).
         """
         self.states = states
         self.transition_matrix = np.array(transition_matrix)
         self.initial_state_probs = np.array(initial_state_probs)
         self.treatment = treatment
         self.price_per_unit = price_per_unit
+        self.regime = regime
+        self.inhibitor_weeks = 0  # Track weeks spent in inhibitor state
         # Validate inputs
         if len(states) != len(transition_matrix):
             raise ValueError(
@@ -142,6 +146,21 @@ class MarkovChain:
         weekly_doses = []
         weekly_costs = []
         current_state = np.random.choice(self.states, p=self.initial_state_probs)
+        self.inhibitor_weeks = 0  # Reset inhibitor weeks
+
+        # ITI success probabilities based on regime
+        if self.regime == Regimes.ON_DEMAND:
+            iti_success_probs = {
+                Status.NO_BLEEDING.value: 0.2,  # 20% to alive_wo_arthropathy
+                Status.CHRONIC_ARTHROPATHY.value: 0.5,  # 50% to chronic_arthropathy
+                Status.SEVERE_ARTHROPATHY.value: 0.3,  # 30% to severe_arthropathy
+            }
+        else:  # PROPHYLAXIS
+            iti_success_probs = {
+                Status.NO_BLEEDING.value: 0.6,  # 60% to alive_wo_arthropathy
+                Status.CHRONIC_ARTHROPATHY.value: 0.3,  # 30% to chronic_arthropathy
+                Status.SEVERE_ARTHROPATHY.value: 0.1,  # 10% to severe_arthropathy
+            }
 
         for week in range(num_steps):
             state_path.append(current_state)
@@ -149,11 +168,31 @@ class MarkovChain:
             weekly_doses.append(dose)
             weekly_costs.append(cost)
 
-            # Transition to next state
-            current_state_idx = self.states.index(current_state)
-            current_state = np.random.choice(
-                self.states, p=self.transition_matrix[current_state_idx]
-            )
+            # Update inhibitor weeks
+            if current_state == Status.INHIBITOR.value:
+                self.inhibitor_weeks += 1
+            else:
+                self.inhibitor_weeks = 0  # Reset if not in inhibitor state
+
+            # Handle ITI after 26 weeks
+            if current_state == Status.INHIBITOR.value and self.inhibitor_weeks >= 26:
+                # 80% chance of ITI success
+                if np.random.random() < 0.8:
+                    # Choose target state based on iti_success_probs
+                    target_states = list(iti_success_probs.keys())
+                    target_probs = list(iti_success_probs.values())
+                    current_state = np.random.choice(target_states, p=target_probs)
+                    self.inhibitor_weeks = 0  # Reset after success
+                else:
+                    # ITI failure: stay in inhibitor, reset for another 6 months
+                    self.inhibitor_weeks = 0
+                    current_state = Status.INHIBITOR.value
+            else:
+                # Normal state transition
+                current_state_idx = self.states.index(current_state)
+                current_state = np.random.choice(
+                    self.states, p=self.transition_matrix[current_state_idx]
+                )
 
         return {
             "state_path": state_path,
