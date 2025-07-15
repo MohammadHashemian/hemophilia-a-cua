@@ -14,4 +14,5 @@ def get_logger():
 
 
 def suppress_matplotlib_debug():
+    _logger.debug("Suppressing matplotlib font manager logger")
     logging.getLogger("matplotlib.font_manager").setLevel(logging.WARNING)

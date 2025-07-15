@@ -1,363 +1,331 @@
 DEBUG: Set display.max_colwidth to None
+DEBUG: Suppressing matplotlib font manager logger
 INFO: Creating new transition matrix at: data/processed/od_transition_matrix.csv
-DEBUG: on_demand alive_wo_arthropathy row sum 0.8289 < 1, adding to NO_BLEEDING
-WARNING: on_demand minor_bleeding row sum 1.5184 > 1, normalizing
-WARNING: on_demand articular_bleeding row sum 1.1068 > 1, normalizing
-WARNING: on_demand surgery_or_injury_or_infection row sum 1.3971 > 1, normalizing
-WARNING: on_demand chronic_arthropathy row sum 1.6799 > 1, normalizing
-WARNING: on_demand severe_arthropathy row sum 1.7199 > 1, normalizing
-WARNING: on_demand inhibitor row sum 1.0005 > 1, normalizing
+WARNING: on_demand alive_wo_arthropathy row sum 1.4747 > 1, normalizing
+WARNING: on_demand severe_arthropathy row sum 2.0242 > 1, normalizing
+WARNING: on_demand chronic_arthropathy row sum 1.9747 > 1, normalizing
+DEBUG: on_demand minor_bleeding row sum 0.9503 < 1, adding to NO_BLEEDING
+DEBUG: on_demand articular_bleeding row sum 0.9508 < 1, adding to NO_BLEEDING
+DEBUG: on_demand surgery_or_injury row sum 0.9503 < 1, adding to NO_BLEEDING
+WARNING: on_demand inhibitor row sum 1.0001 > 1, normalizing
 DEBUG: on_demand transition probabilities from alive_wo_arthropathy:
-DEBUG:   To alive_wo_arthropathy: 0.1711
-DEBUG:   To minor_bleeding: 0.1269
-DEBUG:   To articular_bleeding: 0.6538
-DEBUG:   To surgery_or_injury_or_infection: 0.0381
-DEBUG:   To chronic_arthropathy: 0.0100
+DEBUG:   To chronic_arthropathy: 0.0003
+DEBUG:   To minor_bleeding: 0.1549
+DEBUG:   To articular_bleeding: 0.7981
+DEBUG:   To surgery_or_injury: 0.0465
+DEBUG:   To complication_infection: 0.0001
+DEBUG:   To inhibitor: 0.0001
+DEBUG:   Row sum: 1.0000
+DEBUG: on_demand transition probabilities from severe_arthropathy:
+DEBUG:   To severe_arthropathy: 0.2717
+DEBUG:   To minor_bleeding: 0.1129
+DEBUG:   To articular_bleeding: 0.5814
+DEBUG:   To surgery_or_injury: 0.0339
+DEBUG:   To complication_infection: 0.0000
+DEBUG:   To inhibitor: 0.0001
+DEBUG:   Row sum: 1.0000
+DEBUG: on_demand transition probabilities from chronic_arthropathy:
+DEBUG:   To severe_arthropathy: 0.0003
+DEBUG:   To chronic_arthropathy: 0.2532
+DEBUG:   To minor_bleeding: 0.1157
+DEBUG:   To articular_bleeding: 0.5960
+DEBUG:   To surgery_or_injury: 0.0347
+DEBUG:   To complication_infection: 0.0001
 DEBUG:   To inhibitor: 0.0001
 DEBUG:   Row sum: 1.0000
 DEBUG: on_demand transition probabilities from minor_bleeding:
-DEBUG:   To alive_wo_arthropathy: 0.5269
-DEBUG:   To minor_bleeding: 0.0167
-DEBUG:   To articular_bleeding: 0.4306
-DEBUG:   To surgery_or_injury_or_infection: 0.0251
-DEBUG:   To complication: 0.0007
-DEBUG:   To inhibitor: 0.0001
+DEBUG:   To alive_wo_arthropathy: 0.9997
+DEBUG:   To complication_infection: 0.0001
+DEBUG:   To inhibitor: 0.0002
 DEBUG:   Row sum: 1.0000
 DEBUG: on_demand transition probabilities from articular_bleeding:
-DEBUG:   To alive_wo_arthropathy: 0.7228
-DEBUG:   To minor_bleeding: 0.1147
-DEBUG:   To articular_bleeding: 0.1181
-DEBUG:   To surgery_or_injury_or_infection: 0.0344
-DEBUG:   To chronic_arthropathy: 0.0090
-DEBUG:   To complication: 0.0009
-DEBUG:   To inhibitor: 0.0001
+DEBUG:   To alive_wo_arthropathy: 0.9992
+DEBUG:   To chronic_arthropathy: 0.0005
+DEBUG:   To complication_infection: 0.0001
+DEBUG:   To inhibitor: 0.0002
 DEBUG:   Row sum: 1.0000
-DEBUG: on_demand transition probabilities from surgery_or_injury_or_infection:
-DEBUG:   To alive_wo_arthropathy: 0.4295
-DEBUG:   To minor_bleeding: 0.0908
-DEBUG:   To articular_bleeding: 0.4680
-DEBUG:   To surgery_or_injury_or_infection: 0.0109
-DEBUG:   To complication: 0.0007
-DEBUG:   To inhibitor: 0.0001
+DEBUG: on_demand transition probabilities from surgery_or_injury:
+DEBUG:   To alive_wo_arthropathy: 0.9997
+DEBUG:   To complication_infection: 0.0001
+DEBUG:   To inhibitor: 0.0002
 DEBUG:   To death: 0.0000
 DEBUG:   Row sum: 1.0000
-DEBUG: on_demand transition probabilities from chronic_arthropathy:
-DEBUG:   To minor_bleeding: 0.0756
-DEBUG:   To articular_bleeding: 0.3892
-DEBUG:   To surgery_or_injury_or_infection: 0.0227
-DEBUG:   To chronic_arthropathy: 0.5060
-DEBUG:   To severe_arthropathy: 0.0060
-DEBUG:   To complication: 0.0006
-DEBUG:   To inhibitor: 0.0000
-DEBUG:   Row sum: 1.0000
-DEBUG: on_demand transition probabilities from severe_arthropathy:
-DEBUG:   To minor_bleeding: 0.0738
-DEBUG:   To articular_bleeding: 0.3802
-DEBUG:   To surgery_or_injury_or_infection: 0.0221
-DEBUG:   To severe_arthropathy: 0.5233
-DEBUG:   To complication: 0.0006
-DEBUG:   To inhibitor: 0.0000
-DEBUG:   Row sum: 1.0000
-DEBUG: on_demand transition probabilities from complication:
-DEBUG:   To complication: 1.0000
+DEBUG: on_demand transition probabilities from complication_infection:
+DEBUG:   To complication_infection: 1.0000
 DEBUG:   Row sum: 1.0000
 DEBUG: on_demand transition probabilities from inhibitor:
-DEBUG:   To complication: 0.0005
-DEBUG:   To inhibitor: 0.9995
+DEBUG:   To complication_infection: 0.0000
+DEBUG:   To inhibitor: 1.0000
 DEBUG:   Row sum: 1.0000
 DEBUG: on_demand transition probabilities from death:
 DEBUG:   To death: 1.0000
 DEBUG:   Row sum: 1.0000
 INFO: Saving on_demand transition matrix
 INFO: Creating new transition matrix at: data/processed/pro_transition_matrix.csv
-DEBUG: prophylaxis alive_wo_arthropathy row sum 0.0865 < 1, adding to NO_BLEEDING
-DEBUG: prophylaxis minor_bleeding row sum 0.8769 < 1, adding to NO_BLEEDING
-DEBUG: prophylaxis articular_bleeding row sum 0.8312 < 1, adding to NO_BLEEDING
-DEBUG: prophylaxis surgery_or_injury_or_infection row sum 0.6836 < 1, adding to NO_BLEEDING
-DEBUG: prophylaxis chronic_arthropathy row sum 0.9375 < 1, adding to NO_BLEEDING
-DEBUG: prophylaxis severe_arthropathy row sum 0.9855 < 1, adding to NO_BLEEDING
-WARNING: prophylaxis inhibitor row sum 1.0005 > 1, normalizing
+DEBUG: prophylaxis alive_wo_arthropathy row sum 0.0854 < 1, adding to NO_BLEEDING
+DEBUG: prophylaxis severe_arthropathy row sum 0.6353 < 1, adding to SEVERE_ARTHROPATHY
+DEBUG: prophylaxis chronic_arthropathy row sum 0.5854 < 1, adding to SEVERE_ARTHROPATHY
+DEBUG: prophylaxis minor_bleeding row sum 0.9508 < 1, adding to NO_BLEEDING
+DEBUG: prophylaxis articular_bleeding row sum 0.9509 < 1, adding to NO_BLEEDING
+DEBUG: prophylaxis surgery_or_injury row sum 0.9508 < 1, adding to NO_BLEEDING
+WARNING: prophylaxis inhibitor row sum 1.0001 > 1, normalizing
 DEBUG: prophylaxis transition probabilities from alive_wo_arthropathy:
-DEBUG:   To alive_wo_arthropathy: 0.9135
+DEBUG:   To alive_wo_arthropathy: 0.9146
+DEBUG:   To chronic_arthropathy: 0.0001
 DEBUG:   To minor_bleeding: 0.0108
 DEBUG:   To articular_bleeding: 0.0704
-DEBUG:   To surgery_or_injury_or_infection: 0.0033
-DEBUG:   To chronic_arthropathy: 0.0020
-DEBUG:   To inhibitor: 0.0000
-DEBUG:   Row sum: 1.0000
-DEBUG: prophylaxis transition probabilities from minor_bleeding:
-DEBUG:   To alive_wo_arthropathy: 0.9231
-DEBUG:   To minor_bleeding: 0.0022
-DEBUG:   To articular_bleeding: 0.0704
-DEBUG:   To surgery_or_injury_or_infection: 0.0033
-DEBUG:   To complication: 0.0010
-DEBUG:   To inhibitor: 0.0000
-DEBUG:   Row sum: 1.0000
-DEBUG: prophylaxis transition probabilities from articular_bleeding:
-DEBUG:   To alive_wo_arthropathy: 0.9688
-DEBUG:   To minor_bleeding: 0.0108
-DEBUG:   To articular_bleeding: 0.0141
-DEBUG:   To surgery_or_injury_or_infection: 0.0033
-DEBUG:   To chronic_arthropathy: 0.0020
-DEBUG:   To complication: 0.0010
-DEBUG:   To inhibitor: 0.0000
-DEBUG:   Row sum: 1.0000
-DEBUG: prophylaxis transition probabilities from surgery_or_injury_or_infection:
-DEBUG:   To alive_wo_arthropathy: 0.9164
-DEBUG:   To minor_bleeding: 0.0108
-DEBUG:   To articular_bleeding: 0.0704
-DEBUG:   To surgery_or_injury_or_infection: 0.0013
-DEBUG:   To complication: 0.0010
-DEBUG:   To inhibitor: 0.0000
-DEBUG:   To death: 0.0000
-DEBUG:   Row sum: 1.0000
-DEBUG: prophylaxis transition probabilities from chronic_arthropathy:
-DEBUG:   To alive_wo_arthropathy: 0.0625
-DEBUG:   To minor_bleeding: 0.0108
-DEBUG:   To articular_bleeding: 0.0704
-DEBUG:   To surgery_or_injury_or_infection: 0.0033
-DEBUG:   To chronic_arthropathy: 0.8500
-DEBUG:   To severe_arthropathy: 0.0020
-DEBUG:   To complication: 0.0010
-DEBUG:   To inhibitor: 0.0000
+DEBUG:   To surgery_or_injury: 0.0033
+DEBUG:   To complication_infection: 0.0005
+DEBUG:   To inhibitor: 0.0003
 DEBUG:   Row sum: 1.0000
 DEBUG: prophylaxis transition probabilities from severe_arthropathy:
-DEBUG:   To alive_wo_arthropathy: 0.0145
+DEBUG:   To severe_arthropathy: 0.9147
 DEBUG:   To minor_bleeding: 0.0108
 DEBUG:   To articular_bleeding: 0.0704
-DEBUG:   To surgery_or_injury_or_infection: 0.0033
-DEBUG:   To severe_arthropathy: 0.9000
-DEBUG:   To complication: 0.0010
-DEBUG:   To inhibitor: 0.0000
+DEBUG:   To surgery_or_injury: 0.0033
+DEBUG:   To complication_infection: 0.0005
+DEBUG:   To inhibitor: 0.0003
 DEBUG:   Row sum: 1.0000
-DEBUG: prophylaxis transition probabilities from complication:
-DEBUG:   To complication: 1.0000
+DEBUG: prophylaxis transition probabilities from chronic_arthropathy:
+DEBUG:   To severe_arthropathy: 0.4147
+DEBUG:   To chronic_arthropathy: 0.5000
+DEBUG:   To minor_bleeding: 0.0108
+DEBUG:   To articular_bleeding: 0.0704
+DEBUG:   To surgery_or_injury: 0.0033
+DEBUG:   To complication_infection: 0.0005
+DEBUG:   To inhibitor: 0.0003
+DEBUG:   Row sum: 1.0000
+DEBUG: prophylaxis transition probabilities from minor_bleeding:
+DEBUG:   To alive_wo_arthropathy: 0.9992
+DEBUG:   To complication_infection: 0.0005
+DEBUG:   To inhibitor: 0.0003
+DEBUG:   Row sum: 1.0000
+DEBUG: prophylaxis transition probabilities from articular_bleeding:
+DEBUG:   To alive_wo_arthropathy: 0.9991
+DEBUG:   To chronic_arthropathy: 0.0001
+DEBUG:   To complication_infection: 0.0005
+DEBUG:   To inhibitor: 0.0003
+DEBUG:   Row sum: 1.0000
+DEBUG: prophylaxis transition probabilities from surgery_or_injury:
+DEBUG:   To alive_wo_arthropathy: 0.9992
+DEBUG:   To complication_infection: 0.0005
+DEBUG:   To inhibitor: 0.0003
+DEBUG:   To death: 0.0000
+DEBUG:   Row sum: 1.0000
+DEBUG: prophylaxis transition probabilities from complication_infection:
+DEBUG:   To complication_infection: 1.0000
 DEBUG:   Row sum: 1.0000
 DEBUG: prophylaxis transition probabilities from inhibitor:
-DEBUG:   To complication: 0.0005
-DEBUG:   To inhibitor: 0.9995
+DEBUG:   To complication_infection: 0.0000
+DEBUG:   To inhibitor: 1.0000
 DEBUG:   Row sum: 1.0000
 DEBUG: prophylaxis transition probabilities from death:
 DEBUG:   To death: 1.0000
 DEBUG:   Row sum: 1.0000
 INFO: Saving prophylaxis transition matrix
-INFO: Starting Markov chain simulation with dose and cost calculations
-INFO: Using 4 processes for on_demand simulations
-INFO: Total simulation time for on_demand: 8.88 seconds
-INFO: Using 4 processes for prophylaxis simulations
-INFO: Total simulation time for prophylaxis: 8.36 seconds
-DEBUG: on_demand run: 199 bleed transitions, 181 joint bleed transitions, ABR=2.73, AJBR=2.48
-DEBUG: on_demand run: 199 bleed transitions, 181 joint bleed transitions, ABR=2.73, AJBR=2.48
-DEBUG: on_demand run: 199 bleed transitions, 181 joint bleed transitions, ABR=2.73, AJBR=2.48
-DEBUG: on_demand run: 199 bleed transitions, 181 joint bleed transitions, ABR=2.73, AJBR=2.48
-DEBUG: on_demand run: 51 bleed transitions, 49 joint bleed transitions, ABR=0.70, AJBR=0.67
-DEBUG: on_demand run: 51 bleed transitions, 49 joint bleed transitions, ABR=0.70, AJBR=0.67
-DEBUG: on_demand run: 51 bleed transitions, 49 joint bleed transitions, ABR=0.70, AJBR=0.67
-DEBUG: on_demand run: 51 bleed transitions, 49 joint bleed transitions, ABR=0.70, AJBR=0.67
-DEBUG: on_demand run: 277 bleed transitions, 276 joint bleed transitions, ABR=3.79, AJBR=3.78
-DEBUG: on_demand run: 277 bleed transitions, 276 joint bleed transitions, ABR=3.79, AJBR=3.78
-DEBUG: on_demand run: 277 bleed transitions, 276 joint bleed transitions, ABR=3.79, AJBR=3.78
-DEBUG: on_demand run: 277 bleed transitions, 276 joint bleed transitions, ABR=3.79, AJBR=3.78
-DEBUG: on_demand run: 1367 bleed transitions, 1351 joint bleed transitions, ABR=18.73, AJBR=18.51
-DEBUG: on_demand run: 1367 bleed transitions, 1351 joint bleed transitions, ABR=18.73, AJBR=18.51
-DEBUG: on_demand run: 1367 bleed transitions, 1351 joint bleed transitions, ABR=18.73, AJBR=18.51
-DEBUG: on_demand run: 1367 bleed transitions, 1351 joint bleed transitions, ABR=18.73, AJBR=18.51
-DEBUG: on_demand run: 927 bleed transitions, 879 joint bleed transitions, ABR=12.70, AJBR=12.04
-DEBUG: on_demand run: 927 bleed transitions, 879 joint bleed transitions, ABR=12.70, AJBR=12.04
-DEBUG: on_demand run: 927 bleed transitions, 879 joint bleed transitions, ABR=12.70, AJBR=12.04
-DEBUG: on_demand run: 927 bleed transitions, 879 joint bleed transitions, ABR=12.70, AJBR=12.04
-DEBUG: on_demand run: 397 bleed transitions, 381 joint bleed transitions, ABR=5.44, AJBR=5.22
-DEBUG: on_demand run: 397 bleed transitions, 381 joint bleed transitions, ABR=5.44, AJBR=5.22
-DEBUG: on_demand run: 397 bleed transitions, 381 joint bleed transitions, ABR=5.44, AJBR=5.22
-DEBUG: on_demand run: 397 bleed transitions, 381 joint bleed transitions, ABR=5.44, AJBR=5.22
-DEBUG: on_demand run: 1382 bleed transitions, 1341 joint bleed transitions, ABR=18.93, AJBR=18.37
-DEBUG: on_demand run: 1382 bleed transitions, 1341 joint bleed transitions, ABR=18.93, AJBR=18.37
-DEBUG: on_demand run: 1382 bleed transitions, 1341 joint bleed transitions, ABR=18.93, AJBR=18.37
-DEBUG: on_demand run: 1382 bleed transitions, 1341 joint bleed transitions, ABR=18.93, AJBR=18.37
-DEBUG: on_demand run: 1402 bleed transitions, 1366 joint bleed transitions, ABR=19.21, AJBR=18.71
-DEBUG: on_demand run: 1402 bleed transitions, 1366 joint bleed transitions, ABR=19.21, AJBR=18.71
-DEBUG: on_demand run: 1402 bleed transitions, 1366 joint bleed transitions, ABR=19.21, AJBR=18.71
-DEBUG: on_demand run: 1402 bleed transitions, 1366 joint bleed transitions, ABR=19.21, AJBR=18.71
-DEBUG: on_demand run: 218 bleed transitions, 209 joint bleed transitions, ABR=2.99, AJBR=2.86
-DEBUG: on_demand run: 218 bleed transitions, 209 joint bleed transitions, ABR=2.99, AJBR=2.86
-DEBUG: on_demand run: 218 bleed transitions, 209 joint bleed transitions, ABR=2.99, AJBR=2.86
-DEBUG: on_demand run: 218 bleed transitions, 209 joint bleed transitions, ABR=2.99, AJBR=2.86
-DEBUG: on_demand run: 1392 bleed transitions, 1346 joint bleed transitions, ABR=19.07, AJBR=18.44
-DEBUG: on_demand run: 1392 bleed transitions, 1346 joint bleed transitions, ABR=19.07, AJBR=18.44
-DEBUG: on_demand run: 1392 bleed transitions, 1346 joint bleed transitions, ABR=19.07, AJBR=18.44
-DEBUG: on_demand run: 1392 bleed transitions, 1346 joint bleed transitions, ABR=19.07, AJBR=18.44
-DEBUG: on_demand run: 1368 bleed transitions, 1316 joint bleed transitions, ABR=18.74, AJBR=18.03
-DEBUG: on_demand run: 1368 bleed transitions, 1316 joint bleed transitions, ABR=18.74, AJBR=18.03
-DEBUG: on_demand run: 1368 bleed transitions, 1316 joint bleed transitions, ABR=18.74, AJBR=18.03
-DEBUG: on_demand run: 1368 bleed transitions, 1316 joint bleed transitions, ABR=18.74, AJBR=18.03
-DEBUG: on_demand run: 511 bleed transitions, 510 joint bleed transitions, ABR=7.00, AJBR=6.99
-DEBUG: on_demand run: 511 bleed transitions, 510 joint bleed transitions, ABR=7.00, AJBR=6.99
-DEBUG: on_demand run: 511 bleed transitions, 510 joint bleed transitions, ABR=7.00, AJBR=6.99
-DEBUG: on_demand run: 511 bleed transitions, 510 joint bleed transitions, ABR=7.00, AJBR=6.99
-DEBUG: on_demand run: 67 bleed transitions, 64 joint bleed transitions, ABR=0.92, AJBR=0.88
-DEBUG: on_demand run: 67 bleed transitions, 64 joint bleed transitions, ABR=0.92, AJBR=0.88
-DEBUG: on_demand run: 67 bleed transitions, 64 joint bleed transitions, ABR=0.92, AJBR=0.88
-DEBUG: on_demand run: 67 bleed transitions, 64 joint bleed transitions, ABR=0.92, AJBR=0.88
-DEBUG: on_demand run: 1365 bleed transitions, 1322 joint bleed transitions, ABR=18.70, AJBR=18.11
-DEBUG: on_demand run: 1365 bleed transitions, 1322 joint bleed transitions, ABR=18.70, AJBR=18.11
-DEBUG: on_demand run: 1365 bleed transitions, 1322 joint bleed transitions, ABR=18.70, AJBR=18.11
-DEBUG: on_demand run: 1365 bleed transitions, 1322 joint bleed transitions, ABR=18.70, AJBR=18.11
-DEBUG: on_demand run: 179 bleed transitions, 174 joint bleed transitions, ABR=2.45, AJBR=2.38
-DEBUG: on_demand run: 179 bleed transitions, 174 joint bleed transitions, ABR=2.45, AJBR=2.38
-DEBUG: on_demand run: 179 bleed transitions, 174 joint bleed transitions, ABR=2.45, AJBR=2.38
-DEBUG: on_demand run: 179 bleed transitions, 174 joint bleed transitions, ABR=2.45, AJBR=2.38
-DEBUG: on_demand run: 271 bleed transitions, 264 joint bleed transitions, ABR=3.71, AJBR=3.62
-DEBUG: on_demand run: 271 bleed transitions, 264 joint bleed transitions, ABR=3.71, AJBR=3.62
-DEBUG: on_demand run: 271 bleed transitions, 264 joint bleed transitions, ABR=3.71, AJBR=3.62
-DEBUG: on_demand run: 271 bleed transitions, 264 joint bleed transitions, ABR=3.71, AJBR=3.62
-DEBUG: on_demand run: 35 bleed transitions, 33 joint bleed transitions, ABR=0.48, AJBR=0.45
-DEBUG: on_demand run: 35 bleed transitions, 33 joint bleed transitions, ABR=0.48, AJBR=0.45
-DEBUG: on_demand run: 35 bleed transitions, 33 joint bleed transitions, ABR=0.48, AJBR=0.45
-DEBUG: on_demand run: 35 bleed transitions, 33 joint bleed transitions, ABR=0.48, AJBR=0.45
-DEBUG: on_demand run: 873 bleed transitions, 859 joint bleed transitions, ABR=11.96, AJBR=11.77
-DEBUG: on_demand run: 873 bleed transitions, 859 joint bleed transitions, ABR=11.96, AJBR=11.77
-DEBUG: on_demand run: 873 bleed transitions, 859 joint bleed transitions, ABR=11.96, AJBR=11.77
-DEBUG: on_demand run: 873 bleed transitions, 859 joint bleed transitions, ABR=11.96, AJBR=11.77
-DEBUG: on_demand run: 1350 bleed transitions, 1294 joint bleed transitions, ABR=18.49, AJBR=17.73
-DEBUG: on_demand run: 1350 bleed transitions, 1294 joint bleed transitions, ABR=18.49, AJBR=17.73
-DEBUG: on_demand run: 1350 bleed transitions, 1294 joint bleed transitions, ABR=18.49, AJBR=17.73
-DEBUG: on_demand run: 1350 bleed transitions, 1294 joint bleed transitions, ABR=18.49, AJBR=17.73
-DEBUG: on_demand run: 1329 bleed transitions, 1302 joint bleed transitions, ABR=18.21, AJBR=17.84
-DEBUG: on_demand run: 1329 bleed transitions, 1302 joint bleed transitions, ABR=18.21, AJBR=17.84
-DEBUG: on_demand run: 1329 bleed transitions, 1302 joint bleed transitions, ABR=18.21, AJBR=17.84
-DEBUG: on_demand run: 1329 bleed transitions, 1302 joint bleed transitions, ABR=18.21, AJBR=17.84
-DEBUG: on_demand run: 336 bleed transitions, 334 joint bleed transitions, ABR=4.60, AJBR=4.58
-DEBUG: on_demand run: 336 bleed transitions, 334 joint bleed transitions, ABR=4.60, AJBR=4.58
-DEBUG: on_demand run: 336 bleed transitions, 334 joint bleed transitions, ABR=4.60, AJBR=4.58
-DEBUG: on_demand run: 336 bleed transitions, 334 joint bleed transitions, ABR=4.60, AJBR=4.58
-DEBUG: on_demand run: 731 bleed transitions, 687 joint bleed transitions, ABR=10.01, AJBR=9.41
-DEBUG: on_demand run: 731 bleed transitions, 687 joint bleed transitions, ABR=10.01, AJBR=9.41
-DEBUG: on_demand run: 731 bleed transitions, 687 joint bleed transitions, ABR=10.01, AJBR=9.41
-DEBUG: on_demand run: 731 bleed transitions, 687 joint bleed transitions, ABR=10.01, AJBR=9.41
-DEBUG: on_demand run: 1397 bleed transitions, 1345 joint bleed transitions, ABR=19.14, AJBR=18.42
-DEBUG: on_demand run: 1397 bleed transitions, 1345 joint bleed transitions, ABR=19.14, AJBR=18.42
-DEBUG: on_demand run: 1397 bleed transitions, 1345 joint bleed transitions, ABR=19.14, AJBR=18.42
-DEBUG: on_demand run: 1397 bleed transitions, 1345 joint bleed transitions, ABR=19.14, AJBR=18.42
-DEBUG: on_demand run: 1363 bleed transitions, 1306 joint bleed transitions, ABR=18.67, AJBR=17.89
-DEBUG: on_demand run: 1363 bleed transitions, 1306 joint bleed transitions, ABR=18.67, AJBR=17.89
-DEBUG: on_demand run: 1363 bleed transitions, 1306 joint bleed transitions, ABR=18.67, AJBR=17.89
-DEBUG: on_demand run: 1363 bleed transitions, 1306 joint bleed transitions, ABR=18.67, AJBR=17.89
-DEBUG: on_demand run: 175 bleed transitions, 175 joint bleed transitions, ABR=2.40, AJBR=2.40
-DEBUG: on_demand run: 175 bleed transitions, 175 joint bleed transitions, ABR=2.40, AJBR=2.40
-DEBUG: on_demand run: 175 bleed transitions, 175 joint bleed transitions, ABR=2.40, AJBR=2.40
-DEBUG: on_demand run: 175 bleed transitions, 175 joint bleed transitions, ABR=2.40, AJBR=2.40
-INFO: on_demand: Expected ABR=44.00, Simulated ABR=10.39, Expected AJBR=34.00, Simulated AJBR=10.06
-DEBUG: prophylaxis run: 291 bleed transitions, 250 joint bleed transitions, ABR=3.99, AJBR=3.42
-DEBUG: prophylaxis run: 291 bleed transitions, 250 joint bleed transitions, ABR=3.99, AJBR=3.42
-DEBUG: prophylaxis run: 291 bleed transitions, 250 joint bleed transitions, ABR=3.99, AJBR=3.42
-DEBUG: prophylaxis run: 291 bleed transitions, 250 joint bleed transitions, ABR=3.99, AJBR=3.42
-DEBUG: prophylaxis run: 313 bleed transitions, 259 joint bleed transitions, ABR=4.29, AJBR=3.55
-DEBUG: prophylaxis run: 313 bleed transitions, 259 joint bleed transitions, ABR=4.29, AJBR=3.55
-DEBUG: prophylaxis run: 313 bleed transitions, 259 joint bleed transitions, ABR=4.29, AJBR=3.55
-DEBUG: prophylaxis run: 313 bleed transitions, 259 joint bleed transitions, ABR=4.29, AJBR=3.55
-DEBUG: prophylaxis run: 319 bleed transitions, 267 joint bleed transitions, ABR=4.37, AJBR=3.66
-DEBUG: prophylaxis run: 319 bleed transitions, 267 joint bleed transitions, ABR=4.37, AJBR=3.66
-DEBUG: prophylaxis run: 319 bleed transitions, 267 joint bleed transitions, ABR=4.37, AJBR=3.66
-DEBUG: prophylaxis run: 319 bleed transitions, 267 joint bleed transitions, ABR=4.37, AJBR=3.66
-DEBUG: prophylaxis run: 308 bleed transitions, 256 joint bleed transitions, ABR=4.22, AJBR=3.51
-DEBUG: prophylaxis run: 308 bleed transitions, 256 joint bleed transitions, ABR=4.22, AJBR=3.51
-DEBUG: prophylaxis run: 308 bleed transitions, 256 joint bleed transitions, ABR=4.22, AJBR=3.51
-DEBUG: prophylaxis run: 308 bleed transitions, 256 joint bleed transitions, ABR=4.22, AJBR=3.51
-DEBUG: prophylaxis run: 222 bleed transitions, 196 joint bleed transitions, ABR=3.04, AJBR=2.68
-DEBUG: prophylaxis run: 222 bleed transitions, 196 joint bleed transitions, ABR=3.04, AJBR=2.68
-DEBUG: prophylaxis run: 222 bleed transitions, 196 joint bleed transitions, ABR=3.04, AJBR=2.68
-DEBUG: prophylaxis run: 222 bleed transitions, 196 joint bleed transitions, ABR=3.04, AJBR=2.68
-DEBUG: prophylaxis run: 305 bleed transitions, 269 joint bleed transitions, ABR=4.18, AJBR=3.68
-DEBUG: prophylaxis run: 305 bleed transitions, 269 joint bleed transitions, ABR=4.18, AJBR=3.68
-DEBUG: prophylaxis run: 305 bleed transitions, 269 joint bleed transitions, ABR=4.18, AJBR=3.68
-DEBUG: prophylaxis run: 305 bleed transitions, 269 joint bleed transitions, ABR=4.18, AJBR=3.68
-DEBUG: prophylaxis run: 162 bleed transitions, 132 joint bleed transitions, ABR=2.22, AJBR=1.81
-DEBUG: prophylaxis run: 162 bleed transitions, 132 joint bleed transitions, ABR=2.22, AJBR=1.81
-DEBUG: prophylaxis run: 162 bleed transitions, 132 joint bleed transitions, ABR=2.22, AJBR=1.81
-DEBUG: prophylaxis run: 162 bleed transitions, 132 joint bleed transitions, ABR=2.22, AJBR=1.81
-DEBUG: prophylaxis run: 276 bleed transitions, 229 joint bleed transitions, ABR=3.78, AJBR=3.14
-DEBUG: prophylaxis run: 276 bleed transitions, 229 joint bleed transitions, ABR=3.78, AJBR=3.14
-DEBUG: prophylaxis run: 276 bleed transitions, 229 joint bleed transitions, ABR=3.78, AJBR=3.14
-DEBUG: prophylaxis run: 276 bleed transitions, 229 joint bleed transitions, ABR=3.78, AJBR=3.14
-DEBUG: prophylaxis run: 41 bleed transitions, 33 joint bleed transitions, ABR=0.56, AJBR=0.45
-DEBUG: prophylaxis run: 41 bleed transitions, 33 joint bleed transitions, ABR=0.56, AJBR=0.45
-DEBUG: prophylaxis run: 41 bleed transitions, 33 joint bleed transitions, ABR=0.56, AJBR=0.45
-DEBUG: prophylaxis run: 41 bleed transitions, 33 joint bleed transitions, ABR=0.56, AJBR=0.45
-DEBUG: prophylaxis run: 297 bleed transitions, 236 joint bleed transitions, ABR=4.07, AJBR=3.23
-DEBUG: prophylaxis run: 297 bleed transitions, 236 joint bleed transitions, ABR=4.07, AJBR=3.23
-DEBUG: prophylaxis run: 297 bleed transitions, 236 joint bleed transitions, ABR=4.07, AJBR=3.23
-DEBUG: prophylaxis run: 297 bleed transitions, 236 joint bleed transitions, ABR=4.07, AJBR=3.23
-DEBUG: prophylaxis run: 283 bleed transitions, 237 joint bleed transitions, ABR=3.88, AJBR=3.25
-DEBUG: prophylaxis run: 283 bleed transitions, 237 joint bleed transitions, ABR=3.88, AJBR=3.25
-DEBUG: prophylaxis run: 283 bleed transitions, 237 joint bleed transitions, ABR=3.88, AJBR=3.25
-DEBUG: prophylaxis run: 283 bleed transitions, 237 joint bleed transitions, ABR=3.88, AJBR=3.25
-DEBUG: prophylaxis run: 303 bleed transitions, 262 joint bleed transitions, ABR=4.15, AJBR=3.59
-DEBUG: prophylaxis run: 303 bleed transitions, 262 joint bleed transitions, ABR=4.15, AJBR=3.59
-DEBUG: prophylaxis run: 303 bleed transitions, 262 joint bleed transitions, ABR=4.15, AJBR=3.59
-DEBUG: prophylaxis run: 303 bleed transitions, 262 joint bleed transitions, ABR=4.15, AJBR=3.59
-DEBUG: prophylaxis run: 14 bleed transitions, 12 joint bleed transitions, ABR=0.19, AJBR=0.16
-DEBUG: prophylaxis run: 14 bleed transitions, 12 joint bleed transitions, ABR=0.19, AJBR=0.16
-DEBUG: prophylaxis run: 14 bleed transitions, 12 joint bleed transitions, ABR=0.19, AJBR=0.16
-DEBUG: prophylaxis run: 14 bleed transitions, 12 joint bleed transitions, ABR=0.19, AJBR=0.16
-DEBUG: prophylaxis run: 135 bleed transitions, 123 joint bleed transitions, ABR=1.85, AJBR=1.68
-DEBUG: prophylaxis run: 135 bleed transitions, 123 joint bleed transitions, ABR=1.85, AJBR=1.68
-DEBUG: prophylaxis run: 135 bleed transitions, 123 joint bleed transitions, ABR=1.85, AJBR=1.68
-DEBUG: prophylaxis run: 135 bleed transitions, 123 joint bleed transitions, ABR=1.85, AJBR=1.68
-DEBUG: prophylaxis run: 37 bleed transitions, 36 joint bleed transitions, ABR=0.51, AJBR=0.49
-DEBUG: prophylaxis run: 37 bleed transitions, 36 joint bleed transitions, ABR=0.51, AJBR=0.49
-DEBUG: prophylaxis run: 37 bleed transitions, 36 joint bleed transitions, ABR=0.51, AJBR=0.49
-DEBUG: prophylaxis run: 37 bleed transitions, 36 joint bleed transitions, ABR=0.51, AJBR=0.49
-DEBUG: prophylaxis run: 193 bleed transitions, 162 joint bleed transitions, ABR=2.64, AJBR=2.22
-DEBUG: prophylaxis run: 193 bleed transitions, 162 joint bleed transitions, ABR=2.64, AJBR=2.22
-DEBUG: prophylaxis run: 193 bleed transitions, 162 joint bleed transitions, ABR=2.64, AJBR=2.22
-DEBUG: prophylaxis run: 269 bleed transitions, 240 joint bleed transitions, ABR=3.68, AJBR=3.29
-DEBUG: prophylaxis run: 269 bleed transitions, 240 joint bleed transitions, ABR=3.68, AJBR=3.29
-DEBUG: prophylaxis run: 193 bleed transitions, 162 joint bleed transitions, ABR=2.64, AJBR=2.22
-DEBUG: prophylaxis run: 269 bleed transitions, 240 joint bleed transitions, ABR=3.68, AJBR=3.29
-DEBUG: prophylaxis run: 300 bleed transitions, 249 joint bleed transitions, ABR=4.11, AJBR=3.41
-DEBUG: prophylaxis run: 300 bleed transitions, 249 joint bleed transitions, ABR=4.11, AJBR=3.41
-DEBUG: prophylaxis run: 269 bleed transitions, 240 joint bleed transitions, ABR=3.68, AJBR=3.29
-DEBUG: prophylaxis run: 300 bleed transitions, 249 joint bleed transitions, ABR=4.11, AJBR=3.41
-DEBUG: prophylaxis run: 302 bleed transitions, 251 joint bleed transitions, ABR=4.14, AJBR=3.44
-DEBUG: prophylaxis run: 302 bleed transitions, 251 joint bleed transitions, ABR=4.14, AJBR=3.44
-DEBUG: prophylaxis run: 300 bleed transitions, 249 joint bleed transitions, ABR=4.11, AJBR=3.41
-DEBUG: prophylaxis run: 302 bleed transitions, 251 joint bleed transitions, ABR=4.14, AJBR=3.44
-DEBUG: prophylaxis run: 300 bleed transitions, 265 joint bleed transitions, ABR=4.11, AJBR=3.63
-DEBUG: prophylaxis run: 302 bleed transitions, 251 joint bleed transitions, ABR=4.14, AJBR=3.44
-DEBUG: prophylaxis run: 300 bleed transitions, 265 joint bleed transitions, ABR=4.11, AJBR=3.63
-DEBUG: prophylaxis run: 300 bleed transitions, 265 joint bleed transitions, ABR=4.11, AJBR=3.63
-DEBUG: prophylaxis run: 267 bleed transitions, 229 joint bleed transitions, ABR=3.66, AJBR=3.14
-DEBUG: prophylaxis run: 300 bleed transitions, 265 joint bleed transitions, ABR=4.11, AJBR=3.63
-DEBUG: prophylaxis run: 267 bleed transitions, 229 joint bleed transitions, ABR=3.66, AJBR=3.14
-DEBUG: prophylaxis run: 267 bleed transitions, 229 joint bleed transitions, ABR=3.66, AJBR=3.14
-DEBUG: prophylaxis run: 293 bleed transitions, 249 joint bleed transitions, ABR=4.01, AJBR=3.41
-DEBUG: prophylaxis run: 293 bleed transitions, 249 joint bleed transitions, ABR=4.01, AJBR=3.41
-DEBUG: prophylaxis run: 267 bleed transitions, 229 joint bleed transitions, ABR=3.66, AJBR=3.14
-DEBUG: prophylaxis run: 261 bleed transitions, 218 joint bleed transitions, ABR=3.58, AJBR=2.99
-DEBUG: prophylaxis run: 293 bleed transitions, 249 joint bleed transitions, ABR=4.01, AJBR=3.41
-DEBUG: prophylaxis run: 261 bleed transitions, 218 joint bleed transitions, ABR=3.58, AJBR=2.99
-DEBUG: prophylaxis run: 293 bleed transitions, 249 joint bleed transitions, ABR=4.01, AJBR=3.41
-DEBUG: prophylaxis run: 261 bleed transitions, 218 joint bleed transitions, ABR=3.58, AJBR=2.99
-DEBUG: prophylaxis run: 300 bleed transitions, 250 joint bleed transitions, ABR=4.11, AJBR=3.42
-DEBUG: prophylaxis run: 300 bleed transitions, 250 joint bleed transitions, ABR=4.11, AJBR=3.42
-DEBUG: prophylaxis run: 261 bleed transitions, 218 joint bleed transitions, ABR=3.58, AJBR=2.99
-DEBUG: prophylaxis run: 300 bleed transitions, 250 joint bleed transitions, ABR=4.11, AJBR=3.42
-DEBUG: prophylaxis run: 283 bleed transitions, 246 joint bleed transitions, ABR=3.88, AJBR=3.37
-DEBUG: prophylaxis run: 283 bleed transitions, 246 joint bleed transitions, ABR=3.88, AJBR=3.37
-DEBUG: prophylaxis run: 300 bleed transitions, 250 joint bleed transitions, ABR=4.11, AJBR=3.42
-DEBUG: prophylaxis run: 283 bleed transitions, 246 joint bleed transitions, ABR=3.88, AJBR=3.37
-DEBUG: prophylaxis run: 296 bleed transitions, 241 joint bleed transitions, ABR=4.05, AJBR=3.30
-INFO: prophylaxis: Expected ABR=3.76, Simulated ABR=3.33, Expected AJBR=3.66, Simulated AJBR=2.82
-INFO: Average ABR over 73.00 years: On-demand = 10.39 bleeds/year, Prophylaxis = 3.33 bleeds/year
-INFO: Average AJBR over 73.00 years: On-demand = 10.06 joint bleeds/year, Prophylaxis = 2.82 joint bleeds/year
-INFO: Average total factor VIII dose over 73.00 years: On-demand = 1920055.21 IU, Prophylaxis = 432871.81 IU
-INFO: Average total cost over 73.00 years: On-demand = 111363210381.18 Rial, Prophylaxis = 25106566524.73 Rial
-DEBUG: Week 0, Age 0.00 years, OD State: alive_wo_arthropathy, OD Dose: 0.0 IU, OD Cost: 0.0 Rial, PRO State: alive_wo_arthropathy, PRO Dose: 0.0 IU, PRO Cost: 0.0 Rial
-DEBUG: Week 1, Age 0.02 years, OD State: articular_bleeding, OD Dose: 87.5 IU, OD Cost: 5075000.0 Rial, PRO State: alive_wo_arthropathy, PRO Dose: 0.0 IU, PRO Cost: 0.0 Rial
-DEBUG: Week 2, Age 0.04 years, OD State: alive_wo_arthropathy, OD Dose: 0.0 IU, OD Cost: 0.0 Rial, PRO State: alive_wo_arthropathy, PRO Dose: 0.0 IU, PRO Cost: 0.0 Rial
-DEBUG: Week 3, Age 0.06 years, OD State: alive_wo_arthropathy, OD Dose: 0.0 IU, OD Cost: 0.0 Rial, PRO State: alive_wo_arthropathy, PRO Dose: 0.0 IU, PRO Cost: 0.0 Rial
-DEBUG: Week 4, Age 0.08 years, OD State: articular_bleeding, OD Dose: 87.5 IU, OD Cost: 5075000.0 Rial, PRO State: alive_wo_arthropathy, PRO Dose: 0.0 IU, PRO Cost: 0.0 Rial
-INFO: Total inhibitor state occurrences: 104
-INFO: Total inhibitor state occurrences: 312
+DEBUG: on_demand run: 1112 bleed transitions, 879 joint bleed transitions, ABR=15.23, AJBR=12.04
+DEBUG: on_demand run: 1112 bleed transitions, 879 joint bleed transitions, ABR=15.23, AJBR=12.04
+DEBUG: on_demand run: 1112 bleed transitions, 879 joint bleed transitions, ABR=15.23, AJBR=12.04
+DEBUG: on_demand run: 1112 bleed transitions, 879 joint bleed transitions, ABR=15.23, AJBR=12.04
+DEBUG: on_demand run: 1884 bleed transitions, 1493 joint bleed transitions, ABR=25.81, AJBR=20.45
+DEBUG: on_demand run: 1884 bleed transitions, 1493 joint bleed transitions, ABR=25.81, AJBR=20.45
+DEBUG: on_demand run: 1884 bleed transitions, 1493 joint bleed transitions, ABR=25.81, AJBR=20.45
+DEBUG: on_demand run: 1884 bleed transitions, 1493 joint bleed transitions, ABR=25.81, AJBR=20.45
+DEBUG: on_demand run: 1897 bleed transitions, 1500 joint bleed transitions, ABR=25.99, AJBR=20.55
+DEBUG: on_demand run: 1897 bleed transitions, 1500 joint bleed transitions, ABR=25.99, AJBR=20.55
+DEBUG: on_demand run: 1897 bleed transitions, 1500 joint bleed transitions, ABR=25.99, AJBR=20.55
+DEBUG: on_demand run: 1897 bleed transitions, 1500 joint bleed transitions, ABR=25.99, AJBR=20.55
+DEBUG: on_demand run: 1885 bleed transitions, 1508 joint bleed transitions, ABR=25.82, AJBR=20.66
+DEBUG: on_demand run: 1885 bleed transitions, 1508 joint bleed transitions, ABR=25.82, AJBR=20.66
+DEBUG: on_demand run: 1885 bleed transitions, 1508 joint bleed transitions, ABR=25.82, AJBR=20.66
+DEBUG: on_demand run: 1885 bleed transitions, 1508 joint bleed transitions, ABR=25.82, AJBR=20.66
+DEBUG: on_demand run: 1885 bleed transitions, 1490 joint bleed transitions, ABR=25.82, AJBR=20.41
+DEBUG: on_demand run: 1885 bleed transitions, 1490 joint bleed transitions, ABR=25.82, AJBR=20.41
+DEBUG: on_demand run: 1885 bleed transitions, 1490 joint bleed transitions, ABR=25.82, AJBR=20.41
+DEBUG: on_demand run: 1885 bleed transitions, 1490 joint bleed transitions, ABR=25.82, AJBR=20.41
+DEBUG: on_demand run: 1898 bleed transitions, 1519 joint bleed transitions, ABR=26.00, AJBR=20.81
+DEBUG: on_demand run: 1898 bleed transitions, 1519 joint bleed transitions, ABR=26.00, AJBR=20.81
+DEBUG: on_demand run: 1898 bleed transitions, 1519 joint bleed transitions, ABR=26.00, AJBR=20.81
+DEBUG: on_demand run: 1898 bleed transitions, 1519 joint bleed transitions, ABR=26.00, AJBR=20.81
+DEBUG: on_demand run: 1884 bleed transitions, 1517 joint bleed transitions, ABR=25.81, AJBR=20.78
+DEBUG: on_demand run: 1884 bleed transitions, 1517 joint bleed transitions, ABR=25.81, AJBR=20.78
+DEBUG: on_demand run: 1884 bleed transitions, 1517 joint bleed transitions, ABR=25.81, AJBR=20.78
+DEBUG: on_demand run: 1884 bleed transitions, 1517 joint bleed transitions, ABR=25.81, AJBR=20.78
+DEBUG: on_demand run: 310 bleed transitions, 239 joint bleed transitions, ABR=4.25, AJBR=3.27
+DEBUG: on_demand run: 310 bleed transitions, 239 joint bleed transitions, ABR=4.25, AJBR=3.27
+DEBUG: on_demand run: 310 bleed transitions, 239 joint bleed transitions, ABR=4.25, AJBR=3.27
+DEBUG: on_demand run: 310 bleed transitions, 239 joint bleed transitions, ABR=4.25, AJBR=3.27
+DEBUG: on_demand run: 1897 bleed transitions, 1509 joint bleed transitions, ABR=25.99, AJBR=20.67
+DEBUG: on_demand run: 1897 bleed transitions, 1509 joint bleed transitions, ABR=25.99, AJBR=20.67
+DEBUG: on_demand run: 1897 bleed transitions, 1509 joint bleed transitions, ABR=25.99, AJBR=20.67
+DEBUG: on_demand run: 1897 bleed transitions, 1509 joint bleed transitions, ABR=25.99, AJBR=20.67
+DEBUG: on_demand run: 1897 bleed transitions, 1493 joint bleed transitions, ABR=25.99, AJBR=20.45
+DEBUG: on_demand run: 1897 bleed transitions, 1493 joint bleed transitions, ABR=25.99, AJBR=20.45
+DEBUG: on_demand run: 1897 bleed transitions, 1493 joint bleed transitions, ABR=25.99, AJBR=20.45
+DEBUG: on_demand run: 1897 bleed transitions, 1493 joint bleed transitions, ABR=25.99, AJBR=20.45
+DEBUG: on_demand run: 1898 bleed transitions, 1536 joint bleed transitions, ABR=26.00, AJBR=21.04
+DEBUG: on_demand run: 1898 bleed transitions, 1536 joint bleed transitions, ABR=26.00, AJBR=21.04
+DEBUG: on_demand run: 1898 bleed transitions, 1536 joint bleed transitions, ABR=26.00, AJBR=21.04
+DEBUG: on_demand run: 1898 bleed transitions, 1536 joint bleed transitions, ABR=26.00, AJBR=21.04
+DEBUG: on_demand run: 1898 bleed transitions, 1501 joint bleed transitions, ABR=26.00, AJBR=20.56
+DEBUG: on_demand run: 1898 bleed transitions, 1501 joint bleed transitions, ABR=26.00, AJBR=20.56
+DEBUG: on_demand run: 1898 bleed transitions, 1501 joint bleed transitions, ABR=26.00, AJBR=20.56
+DEBUG: on_demand run: 1898 bleed transitions, 1501 joint bleed transitions, ABR=26.00, AJBR=20.56
+DEBUG: on_demand run: 1898 bleed transitions, 1515 joint bleed transitions, ABR=26.00, AJBR=20.75
+DEBUG: on_demand run: 1898 bleed transitions, 1515 joint bleed transitions, ABR=26.00, AJBR=20.75
+DEBUG: on_demand run: 1898 bleed transitions, 1515 joint bleed transitions, ABR=26.00, AJBR=20.75
+DEBUG: on_demand run: 1898 bleed transitions, 1515 joint bleed transitions, ABR=26.00, AJBR=20.75
+DEBUG: on_demand run: 1897 bleed transitions, 1499 joint bleed transitions, ABR=25.99, AJBR=20.53
+DEBUG: on_demand run: 1897 bleed transitions, 1499 joint bleed transitions, ABR=25.99, AJBR=20.53
+DEBUG: on_demand run: 1897 bleed transitions, 1499 joint bleed transitions, ABR=25.99, AJBR=20.53
+DEBUG: on_demand run: 1897 bleed transitions, 1499 joint bleed transitions, ABR=25.99, AJBR=20.53
+DEBUG: on_demand run: 1871 bleed transitions, 1499 joint bleed transitions, ABR=25.63, AJBR=20.53
+DEBUG: on_demand run: 1871 bleed transitions, 1499 joint bleed transitions, ABR=25.63, AJBR=20.53
+DEBUG: on_demand run: 1871 bleed transitions, 1499 joint bleed transitions, ABR=25.63, AJBR=20.53
+DEBUG: on_demand run: 1871 bleed transitions, 1499 joint bleed transitions, ABR=25.63, AJBR=20.53
+DEBUG: on_demand run: 1884 bleed transitions, 1506 joint bleed transitions, ABR=25.81, AJBR=20.63
+DEBUG: on_demand run: 1884 bleed transitions, 1506 joint bleed transitions, ABR=25.81, AJBR=20.63
+DEBUG: on_demand run: 1884 bleed transitions, 1506 joint bleed transitions, ABR=25.81, AJBR=20.63
+DEBUG: on_demand run: 1884 bleed transitions, 1506 joint bleed transitions, ABR=25.81, AJBR=20.63
+DEBUG: on_demand run: 1885 bleed transitions, 1509 joint bleed transitions, ABR=25.82, AJBR=20.67
+DEBUG: on_demand run: 1885 bleed transitions, 1509 joint bleed transitions, ABR=25.82, AJBR=20.67
+DEBUG: on_demand run: 1885 bleed transitions, 1509 joint bleed transitions, ABR=25.82, AJBR=20.67
+DEBUG: on_demand run: 1885 bleed transitions, 1509 joint bleed transitions, ABR=25.82, AJBR=20.67
+DEBUG: on_demand run: 1845 bleed transitions, 1474 joint bleed transitions, ABR=25.27, AJBR=20.19
+DEBUG: on_demand run: 1845 bleed transitions, 1474 joint bleed transitions, ABR=25.27, AJBR=20.19
+DEBUG: on_demand run: 1845 bleed transitions, 1474 joint bleed transitions, ABR=25.27, AJBR=20.19
+DEBUG: on_demand run: 1845 bleed transitions, 1474 joint bleed transitions, ABR=25.27, AJBR=20.19
+DEBUG: on_demand run: 1897 bleed transitions, 1502 joint bleed transitions, ABR=25.99, AJBR=20.58
+DEBUG: on_demand run: 1897 bleed transitions, 1502 joint bleed transitions, ABR=25.99, AJBR=20.58
+DEBUG: on_demand run: 1897 bleed transitions, 1502 joint bleed transitions, ABR=25.99, AJBR=20.58
+DEBUG: on_demand run: 1897 bleed transitions, 1502 joint bleed transitions, ABR=25.99, AJBR=20.58
+DEBUG: on_demand run: 1884 bleed transitions, 1501 joint bleed transitions, ABR=25.81, AJBR=20.56
+DEBUG: on_demand run: 1884 bleed transitions, 1501 joint bleed transitions, ABR=25.81, AJBR=20.56
+DEBUG: on_demand run: 1884 bleed transitions, 1501 joint bleed transitions, ABR=25.81, AJBR=20.56
+DEBUG: on_demand run: 1884 bleed transitions, 1501 joint bleed transitions, ABR=25.81, AJBR=20.56
+DEBUG: on_demand run: 1885 bleed transitions, 1519 joint bleed transitions, ABR=25.82, AJBR=20.81
+DEBUG: on_demand run: 1885 bleed transitions, 1519 joint bleed transitions, ABR=25.82, AJBR=20.81
+DEBUG: on_demand run: 1885 bleed transitions, 1519 joint bleed transitions, ABR=25.82, AJBR=20.81
+DEBUG: on_demand run: 1885 bleed transitions, 1519 joint bleed transitions, ABR=25.82, AJBR=20.81
+DEBUG: on_demand run: 1881 bleed transitions, 1520 joint bleed transitions, ABR=25.77, AJBR=20.82
+DEBUG: on_demand run: 1881 bleed transitions, 1520 joint bleed transitions, ABR=25.77, AJBR=20.82
+DEBUG: on_demand run: 1881 bleed transitions, 1520 joint bleed transitions, ABR=25.77, AJBR=20.82
+DEBUG: on_demand run: 1881 bleed transitions, 1520 joint bleed transitions, ABR=25.77, AJBR=20.82
+DEBUG: on_demand run: 1884 bleed transitions, 1488 joint bleed transitions, ABR=25.81, AJBR=20.38
+DEBUG: on_demand run: 1884 bleed transitions, 1488 joint bleed transitions, ABR=25.81, AJBR=20.38
+DEBUG: on_demand run: 1884 bleed transitions, 1488 joint bleed transitions, ABR=25.81, AJBR=20.38
+DEBUG: on_demand run: 1884 bleed transitions, 1488 joint bleed transitions, ABR=25.81, AJBR=20.38
+DEBUG: on_demand run: 409 bleed transitions, 316 joint bleed transitions, ABR=5.60, AJBR=4.33
+DEBUG: on_demand run: 409 bleed transitions, 316 joint bleed transitions, ABR=5.60, AJBR=4.33
+DEBUG: on_demand run: 409 bleed transitions, 316 joint bleed transitions, ABR=5.60, AJBR=4.33
+DEBUG: on_demand run: 409 bleed transitions, 316 joint bleed transitions, ABR=5.60, AJBR=4.33
+DEBUG: on_demand run: 1885 bleed transitions, 1491 joint bleed transitions, ABR=25.82, AJBR=20.42
+DEBUG: on_demand run: 1885 bleed transitions, 1491 joint bleed transitions, ABR=25.82, AJBR=20.42
+DEBUG: on_demand run: 1885 bleed transitions, 1491 joint bleed transitions, ABR=25.82, AJBR=20.42
+DEBUG: on_demand run: 1885 bleed transitions, 1491 joint bleed transitions, ABR=25.82, AJBR=20.42
+INFO: on_demand: Expected ABR=44.00, Simulated ABR=23.75, Expected AJBR=34.00, Simulated AJBR=18.92
+DEBUG: prophylaxis run: 308 bleed transitions, 260 joint bleed transitions, ABR=4.22, AJBR=3.56
+DEBUG: prophylaxis run: 308 bleed transitions, 260 joint bleed transitions, ABR=4.22, AJBR=3.56
+DEBUG: prophylaxis run: 308 bleed transitions, 260 joint bleed transitions, ABR=4.22, AJBR=3.56
+DEBUG: prophylaxis run: 308 bleed transitions, 260 joint bleed transitions, ABR=4.22, AJBR=3.56
+DEBUG: prophylaxis run: 141 bleed transitions, 121 joint bleed transitions, ABR=1.93, AJBR=1.66
+DEBUG: prophylaxis run: 141 bleed transitions, 121 joint bleed transitions, ABR=1.93, AJBR=1.66
+DEBUG: prophylaxis run: 141 bleed transitions, 121 joint bleed transitions, ABR=1.93, AJBR=1.66
+DEBUG: prophylaxis run: 141 bleed transitions, 121 joint bleed transitions, ABR=1.93, AJBR=1.66
+DEBUG: prophylaxis run: 15 bleed transitions, 14 joint bleed transitions, ABR=0.21, AJBR=0.19
+DEBUG: prophylaxis run: 15 bleed transitions, 14 joint bleed transitions, ABR=0.21, AJBR=0.19
+DEBUG: prophylaxis run: 15 bleed transitions, 14 joint bleed transitions, ABR=0.21, AJBR=0.19
+DEBUG: prophylaxis run: 15 bleed transitions, 14 joint bleed transitions, ABR=0.21, AJBR=0.19
+DEBUG: prophylaxis run: 78 bleed transitions, 71 joint bleed transitions, ABR=1.07, AJBR=0.97
+DEBUG: prophylaxis run: 78 bleed transitions, 71 joint bleed transitions, ABR=1.07, AJBR=0.97
+DEBUG: prophylaxis run: 78 bleed transitions, 71 joint bleed transitions, ABR=1.07, AJBR=0.97
+DEBUG: prophylaxis run: 78 bleed transitions, 71 joint bleed transitions, ABR=1.07, AJBR=0.97
+DEBUG: prophylaxis run: 311 bleed transitions, 269 joint bleed transitions, ABR=4.26, AJBR=3.68
+DEBUG: prophylaxis run: 311 bleed transitions, 269 joint bleed transitions, ABR=4.26, AJBR=3.68
+DEBUG: prophylaxis run: 311 bleed transitions, 269 joint bleed transitions, ABR=4.26, AJBR=3.68
+DEBUG: prophylaxis run: 311 bleed transitions, 269 joint bleed transitions, ABR=4.26, AJBR=3.68
+DEBUG: prophylaxis run: 276 bleed transitions, 236 joint bleed transitions, ABR=3.78, AJBR=3.23
+DEBUG: prophylaxis run: 276 bleed transitions, 236 joint bleed transitions, ABR=3.78, AJBR=3.23
+DEBUG: prophylaxis run: 276 bleed transitions, 236 joint bleed transitions, ABR=3.78, AJBR=3.23
+DEBUG: prophylaxis run: 276 bleed transitions, 236 joint bleed transitions, ABR=3.78, AJBR=3.23
+DEBUG: prophylaxis run: 31 bleed transitions, 22 joint bleed transitions, ABR=0.42, AJBR=0.30
+DEBUG: prophylaxis run: 31 bleed transitions, 22 joint bleed transitions, ABR=0.42, AJBR=0.30
+DEBUG: prophylaxis run: 31 bleed transitions, 22 joint bleed transitions, ABR=0.42, AJBR=0.30
+DEBUG: prophylaxis run: 31 bleed transitions, 22 joint bleed transitions, ABR=0.42, AJBR=0.30
+DEBUG: prophylaxis run: 123 bleed transitions, 101 joint bleed transitions, ABR=1.68, AJBR=1.38
+DEBUG: prophylaxis run: 123 bleed transitions, 101 joint bleed transitions, ABR=1.68, AJBR=1.38
+DEBUG: prophylaxis run: 123 bleed transitions, 101 joint bleed transitions, ABR=1.68, AJBR=1.38
+DEBUG: prophylaxis run: 123 bleed transitions, 101 joint bleed transitions, ABR=1.68, AJBR=1.38
+DEBUG: prophylaxis run: 66 bleed transitions, 52 joint bleed transitions, ABR=0.90, AJBR=0.71
+DEBUG: prophylaxis run: 66 bleed transitions, 52 joint bleed transitions, ABR=0.90, AJBR=0.71
+DEBUG: prophylaxis run: 66 bleed transitions, 52 joint bleed transitions, ABR=0.90, AJBR=0.71
+DEBUG: prophylaxis run: 66 bleed transitions, 52 joint bleed transitions, ABR=0.90, AJBR=0.71
+DEBUG: prophylaxis run: 77 bleed transitions, 60 joint bleed transitions, ABR=1.05, AJBR=0.82
+DEBUG: prophylaxis run: 77 bleed transitions, 60 joint bleed transitions, ABR=1.05, AJBR=0.82
+DEBUG: prophylaxis run: 77 bleed transitions, 60 joint bleed transitions, ABR=1.05, AJBR=0.82
+DEBUG: prophylaxis run: 77 bleed transitions, 60 joint bleed transitions, ABR=1.05, AJBR=0.82
+DEBUG: prophylaxis run: 297 bleed transitions, 244 joint bleed transitions, ABR=4.07, AJBR=3.34
+DEBUG: prophylaxis run: 297 bleed transitions, 244 joint bleed transitions, ABR=4.07, AJBR=3.34
+DEBUG: prophylaxis run: 297 bleed transitions, 244 joint bleed transitions, ABR=4.07, AJBR=3.34
+DEBUG: prophylaxis run: 297 bleed transitions, 244 joint bleed transitions, ABR=4.07, AJBR=3.34
+DEBUG: prophylaxis run: 244 bleed transitions, 212 joint bleed transitions, ABR=3.34, AJBR=2.90
+DEBUG: prophylaxis run: 244 bleed transitions, 212 joint bleed transitions, ABR=3.34, AJBR=2.90
+DEBUG: prophylaxis run: 30 bleed transitions, 25 joint bleed transitions, ABR=0.41, AJBR=0.34
+DEBUG: prophylaxis run: 244 bleed transitions, 212 joint bleed transitions, ABR=3.34, AJBR=2.90
+DEBUG: prophylaxis run: 244 bleed transitions, 212 joint bleed transitions, ABR=3.34, AJBR=2.90
+DEBUG: prophylaxis run: 30 bleed transitions, 25 joint bleed transitions, ABR=0.41, AJBR=0.34
+DEBUG: prophylaxis run: 30 bleed transitions, 25 joint bleed transitions, ABR=0.41, AJBR=0.34
+DEBUG: prophylaxis run: 298 bleed transitions, 246 joint bleed transitions, ABR=4.08, AJBR=3.37
+DEBUG: prophylaxis run: 30 bleed transitions, 25 joint bleed transitions, ABR=0.41, AJBR=0.34
+DEBUG: prophylaxis run: 298 bleed transitions, 246 joint bleed transitions, ABR=4.08, AJBR=3.37
+DEBUG: prophylaxis run: 155 bleed transitions, 133 joint bleed transitions, ABR=2.12, AJBR=1.82
+DEBUG: prophylaxis run: 298 bleed transitions, 246 joint bleed transitions, ABR=4.08, AJBR=3.37
+DEBUG: prophylaxis run: 298 bleed transitions, 246 joint bleed transitions, ABR=4.08, AJBR=3.37
+DEBUG: prophylaxis run: 155 bleed transitions, 133 joint bleed transitions, ABR=2.12, AJBR=1.82
+DEBUG: prophylaxis run: 217 bleed transitions, 177 joint bleed transitions, ABR=2.97, AJBR=2.42
+DEBUG: prophylaxis run: 155 bleed transitions, 133 joint bleed transitions, ABR=2.12, AJBR=1.82
+DEBUG: prophylaxis run: 155 bleed transitions, 133 joint bleed transitions, ABR=2.12, AJBR=1.82
+DEBUG: prophylaxis run: 217 bleed transitions, 177 joint bleed transitions, ABR=2.97, AJBR=2.42
+DEBUG: prophylaxis run: 101 bleed transitions, 91 joint bleed transitions, ABR=1.38, AJBR=1.25
+DEBUG: prophylaxis run: 217 bleed transitions, 177 joint bleed transitions, ABR=2.97, AJBR=2.42
+DEBUG: prophylaxis run: 217 bleed transitions, 177 joint bleed transitions, ABR=2.97, AJBR=2.42
+DEBUG: prophylaxis run: 101 bleed transitions, 91 joint bleed transitions, ABR=1.38, AJBR=1.25
+DEBUG: prophylaxis run: 35 bleed transitions, 30 joint bleed transitions, ABR=0.48, AJBR=0.41
+DEBUG: prophylaxis run: 101 bleed transitions, 91 joint bleed transitions, ABR=1.38, AJBR=1.25
+DEBUG: prophylaxis run: 101 bleed transitions, 91 joint bleed transitions, ABR=1.38, AJBR=1.25
+DEBUG: prophylaxis run: 35 bleed transitions, 30 joint bleed transitions, ABR=0.48, AJBR=0.41
+DEBUG: prophylaxis run: 11 bleed transitions, 7 joint bleed transitions, ABR=0.15, AJBR=0.10
+DEBUG: prophylaxis run: 35 bleed transitions, 30 joint bleed transitions, ABR=0.48, AJBR=0.41
+DEBUG: prophylaxis run: 35 bleed transitions, 30 joint bleed transitions, ABR=0.48, AJBR=0.41
+DEBUG: prophylaxis run: 11 bleed transitions, 7 joint bleed transitions, ABR=0.15, AJBR=0.10
+DEBUG: prophylaxis run: 11 bleed transitions, 7 joint bleed transitions, ABR=0.15, AJBR=0.10
+DEBUG: prophylaxis run: 26 bleed transitions, 24 joint bleed transitions, ABR=0.36, AJBR=0.33
+DEBUG: prophylaxis run: 11 bleed transitions, 7 joint bleed transitions, ABR=0.15, AJBR=0.10
+DEBUG: prophylaxis run: 26 bleed transitions, 24 joint bleed transitions, ABR=0.36, AJBR=0.33
+DEBUG: prophylaxis run: 298 bleed transitions, 257 joint bleed transitions, ABR=4.08, AJBR=3.52
+DEBUG: prophylaxis run: 26 bleed transitions, 24 joint bleed transitions, ABR=0.36, AJBR=0.33
+DEBUG: prophylaxis run: 26 bleed transitions, 24 joint bleed transitions, ABR=0.36, AJBR=0.33
+DEBUG: prophylaxis run: 298 bleed transitions, 257 joint bleed transitions, ABR=4.08, AJBR=3.52
+DEBUG: prophylaxis run: 33 bleed transitions, 26 joint bleed transitions, ABR=0.45, AJBR=0.36
+DEBUG: prophylaxis run: 298 bleed transitions, 257 joint bleed transitions, ABR=4.08, AJBR=3.52
+DEBUG: prophylaxis run: 298 bleed transitions, 257 joint bleed transitions, ABR=4.08, AJBR=3.52
+DEBUG: prophylaxis run: 33 bleed transitions, 26 joint bleed transitions, ABR=0.45, AJBR=0.36
+DEBUG: prophylaxis run: 33 bleed transitions, 26 joint bleed transitions, ABR=0.45, AJBR=0.36
+DEBUG: prophylaxis run: 33 bleed transitions, 26 joint bleed transitions, ABR=0.45, AJBR=0.36
+DEBUG: prophylaxis run: 299 bleed transitions, 249 joint bleed transitions, ABR=4.10, AJBR=3.41
+DEBUG: prophylaxis run: 299 bleed transitions, 249 joint bleed transitions, ABR=4.10, AJBR=3.41
+DEBUG: prophylaxis run: 299 bleed transitions, 249 joint bleed transitions, ABR=4.10, AJBR=3.41
+DEBUG: prophylaxis run: 299 bleed transitions, 249 joint bleed transitions, ABR=4.10, AJBR=3.41
+DEBUG: prophylaxis run: 286 bleed transitions, 241 joint bleed transitions, ABR=3.92, AJBR=3.30
+DEBUG: prophylaxis run: 286 bleed transitions, 241 joint bleed transitions, ABR=3.92, AJBR=3.30
+DEBUG: prophylaxis run: 286 bleed transitions, 241 joint bleed transitions, ABR=3.92, AJBR=3.30
+DEBUG: prophylaxis run: 175 bleed transitions, 150 joint bleed transitions, ABR=2.40, AJBR=2.05
+DEBUG: prophylaxis run: 286 bleed transitions, 241 joint bleed transitions, ABR=3.92, AJBR=3.30
+DEBUG: prophylaxis run: 175 bleed transitions, 150 joint bleed transitions, ABR=2.40, AJBR=2.05
+DEBUG: prophylaxis run: 175 bleed transitions, 150 joint bleed transitions, ABR=2.40, AJBR=2.05
+DEBUG: prophylaxis run: 175 bleed transitions, 150 joint bleed transitions, ABR=2.40, AJBR=2.05
+INFO: prophylaxis: Expected ABR=3.76, Simulated ABR=2.15, Expected AJBR=3.66, Simulated AJBR=1.82
+INFO: Total inhibitor state occurrences: 1900
+INFO: Total inhibitor state occurrences: 1664
 INFO: Saved post-ITI state distribution plot to post_iti_states_lifetime.png
 INFO: Saved state proportions time series plot to state_proportions_lifetime.png

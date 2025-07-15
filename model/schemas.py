@@ -9,12 +9,12 @@ class Regimes(Enum):
 
 class Status(Enum):
     NO_BLEEDING = "alive_wo_arthropathy"
+    SEVERE_ARTHROPATHY = "severe_arthropathy"
+    CHRONIC_ARTHROPATHY = "chronic_arthropathy"
     MINOR_BLEEDING = "minor_bleeding"
     MAJOR_BLEEDING = "articular_bleeding"
-    CRITICAL_BLEEDING = "surgery_or_injury_or_infection"
-    CHRONIC_ARTHROPATHY = "chronic_arthropathy"
-    SEVERE_ARTHROPATHY = "severe_arthropathy"
-    COMPLICATION = "complication"
+    CRITICAL_BLEEDING = "surgery_or_injury"
+    COMPLICATION = "complication_infection"
     INHIBITOR = "inhibitor"
     DEATH = "death"
 

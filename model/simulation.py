@@ -1,3 +1,4 @@
+from enlighten import Counter
 from src.utils.logger import get_logger
 from src.data.loaders import PROJECT_ROOT
 from model.treatments import initialize_treatments
@@ -19,18 +20,25 @@ import time
 logger = get_logger()
 
 
+import enlighten
+import multiprocessing
+import asyncio
+from multiprocessing import Pool
+import time
+import logging
+
+logger = logging.getLogger(__name__)
+
+
 def run_simulation(args):
     """Run a single Markov chain simulation (for multiprocessing)."""
     markov_chain, num_steps = args
-    # start_time = time.time()
+    markov_chain: MarkovChain
     result = markov_chain.simulate(num_steps)
-    # logger.debug(
-    #     f"Completed simulation run for {markov_chain.regime.value} in {time.time() - start_time:.2f} seconds"
-    # )
     return result
 
 
-async def run_simulations(markov_chain, num_steps, num_runs):
+async def run_simulations(markov_chain: MarkovChain, num_steps: int, num_runs: int):
     """Run multiple simulations using multiprocessing with a single progress bar."""
     results = []
     start_total = time.time()
@@ -39,30 +47,32 @@ async def run_simulations(markov_chain, num_steps, num_runs):
         f"Using {num_processes} processes for {markov_chain.regime.value} simulations"
     )
 
-    with tqdm(
-        total=num_runs,
-        desc=f"Simulating {markov_chain.regime.value}",
-        position=0,
-        leave=True,
-    ) as pbar:
+    # Initialize Enlighten progress bar
+    manager = enlighten.get_manager()
+    pbar: Counter = manager.counter(
+        total=num_runs, desc=f"Simulating {markov_chain.regime.value}", leave=True
+    )
 
-        def update_pbar(_):
-            pbar.update(1)
-            pbar.refresh()
+    def update_pbar(_):
+        pbar.update(1)
 
-        with Pool(processes=num_processes) as pool:
-            tasks = [
-                pool.apply_async(
-                    run_simulation,
-                    args=((markov_chain, num_steps),),
-                    callback=update_pbar,
-                )
-                for _ in range(num_runs)
-            ]
-            for task in tasks:
-                result = task.get()
-                results.append(result)
-                await asyncio.sleep(0.01)
+    with Pool(processes=num_processes) as pool:
+        tasks = [
+            pool.apply_async(
+                run_simulation,
+                args=((markov_chain, num_steps),),
+                callback=update_pbar,
+            )
+            for _ in range(num_runs)
+        ]
+        for task in tasks:
+            result = task.get()
+            results.append(result)
+            await asyncio.sleep(0.01)
+
+    pbar.close()
+    manager.stop()
+
     logger.info(
         f"Total simulation time for {markov_chain.regime.value}: {time.time() - start_total:.2f} seconds"
     )
@@ -75,12 +85,10 @@ def run():
     pro_matrix_path = PROJECT_ROOT / "data" / "processed" / "pro_transition_matrix.csv"
     treatments = initialize_treatments()
     states = [state.value for state in Status]
-    od_matrix = initialize_transition_matrix(
-        od_matrix_path, Regimes.ON_DEMAND
-    ).to_numpy()
-    pro_matrix = initialize_transition_matrix(
-        pro_matrix_path, Regimes.PROPHYLAXIS
-    ).to_numpy()
+    od_matrix = initialize_transition_matrix(od_matrix_path, Regimes.ON_DEMAND)
+    pro_matrix = initialize_transition_matrix(pro_matrix_path, Regimes.PROPHYLAXIS)
+    od_matrix = od_matrix.to_numpy()
+    pro_matrix = pro_matrix.to_numpy()
 
     initial_state_probs = np.zeros(len(states))
     no_bleeding_idx = states.index(Status.NO_BLEEDING.value)

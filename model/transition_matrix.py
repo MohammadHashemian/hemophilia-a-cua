@@ -9,7 +9,8 @@ from model.constants import (
     ON_DEMAND_ARTHROPATHY_PROGRESSION_PROB,
     PROPHYLAXIS_ARTHROPATHY_PROGRESSION_PROB,
     CRITICAL_BLEED_DEATH_PROB,
-    COMPLICATION_PROB,
+    ON_DEMAND_COMPLICATION_PROB,
+    PROPHYLAXIS_COMPLICATION_PROB,
     ITI_COMPLICATION_PROB,
     CHRONIC_ARTHROPATHY_STAY_PROB,
     SEVERE_ARTHROPATHY_STAY_PROB,
@@ -80,9 +81,14 @@ def initialize_transition_matrix(
         if regime == Regimes.ON_DEMAND
         else PROPHYLAXIS_ARTHROPATHY_PROGRESSION_PROB
     )
+    complication_prob = (
+        ON_DEMAND_COMPLICATION_PROB
+        if regime == Regimes.ON_DEMAND
+        else PROPHYLAXIS_COMPLICATION_PROB
+    )
 
-    # Compute weekly bleeding probabilities to produce exact ABR
-    weekly_abr = treatment.abr / 52  # Total bleeding events per week
+    # Compute weekly bleeding probabilities
+    weekly_abr = treatment.abr / 52
     weekly_eabr = (
         (treatment.eabr / treatment.abr) * weekly_abr if treatment.abr > 0 else 0.0
     )
@@ -93,8 +99,8 @@ def initialize_transition_matrix(
         (treatment.albr / treatment.abr) * weekly_abr if treatment.abr > 0 else 0.0
     )
 
-    # Increase bleeding probabilities to ensure target ABR
-    bleed_scale = 1.0  # Adjust if needed after testing
+    # Scale bleeding probabilities for on-demand to achieve target ABR
+    bleed_scale = 1.8 if regime == Regimes.ON_DEMAND else 1.0
     weekly_eabr *= bleed_scale
     weekly_ajbr *= bleed_scale
     weekly_albr *= bleed_scale
@@ -107,34 +113,20 @@ def initialize_transition_matrix(
             df.loc[state, Status.CRITICAL_BLEEDING.value] = weekly_albr
             df.loc[state, Status.CHRONIC_ARTHROPATHY.value] = arthropathy_prob
             df.loc[state, Status.INHIBITOR.value] = inhibitor_prob
+            df.loc[state, Status.COMPLICATION.value] = complication_prob
         elif state == Status.MINOR_BLEEDING.value:
             df.loc[state, Status.NO_BLEEDING.value] = BLEED_RESOLUTION_PROB
-            df.loc[state, Status.MINOR_BLEEDING.value] = weekly_eabr * (
-                1 - BLEED_RESOLUTION_PROB
-            )
-            df.loc[state, Status.MAJOR_BLEEDING.value] = weekly_ajbr
-            df.loc[state, Status.CRITICAL_BLEEDING.value] = weekly_albr
-            df.loc[state, Status.COMPLICATION.value] = COMPLICATION_PROB
+            df.loc[state, Status.COMPLICATION.value] = complication_prob
             df.loc[state, Status.INHIBITOR.value] = inhibitor_prob
         elif state == Status.MAJOR_BLEEDING.value:
             df.loc[state, Status.NO_BLEEDING.value] = BLEED_RESOLUTION_PROB
-            df.loc[state, Status.MINOR_BLEEDING.value] = weekly_eabr
-            df.loc[state, Status.MAJOR_BLEEDING.value] = weekly_ajbr * (
-                1 - BLEED_RESOLUTION_PROB
-            )
             df.loc[state, Status.CHRONIC_ARTHROPATHY.value] = arthropathy_prob
-            df.loc[state, Status.CRITICAL_BLEEDING.value] = weekly_albr
-            df.loc[state, Status.COMPLICATION.value] = COMPLICATION_PROB
+            df.loc[state, Status.COMPLICATION.value] = complication_prob
             df.loc[state, Status.INHIBITOR.value] = inhibitor_prob
         elif state == Status.CRITICAL_BLEEDING.value:
             df.loc[state, Status.NO_BLEEDING.value] = CRITICAL_BLEED_RESOLUTION_PROB
-            df.loc[state, Status.MINOR_BLEEDING.value] = weekly_eabr
-            df.loc[state, Status.MAJOR_BLEEDING.value] = weekly_ajbr
-            df.loc[state, Status.CRITICAL_BLEEDING.value] = weekly_albr * (
-                1 - CRITICAL_BLEED_RESOLUTION_PROB
-            )
             df.loc[state, Status.DEATH.value] = CRITICAL_BLEED_DEATH_PROB
-            df.loc[state, Status.COMPLICATION.value] = COMPLICATION_PROB
+            df.loc[state, Status.COMPLICATION.value] = complication_prob
             df.loc[state, Status.INHIBITOR.value] = inhibitor_prob
         elif state == Status.CHRONIC_ARTHROPATHY.value:
             df.loc[state, Status.CHRONIC_ARTHROPATHY.value] = (
@@ -144,7 +136,7 @@ def initialize_transition_matrix(
             df.loc[state, Status.MINOR_BLEEDING.value] = weekly_eabr
             df.loc[state, Status.MAJOR_BLEEDING.value] = weekly_ajbr
             df.loc[state, Status.CRITICAL_BLEEDING.value] = weekly_albr
-            df.loc[state, Status.COMPLICATION.value] = COMPLICATION_PROB
+            df.loc[state, Status.COMPLICATION.value] = complication_prob
             df.loc[state, Status.INHIBITOR.value] = inhibitor_prob
         elif state == Status.SEVERE_ARTHROPATHY.value:
             df.loc[state, Status.SEVERE_ARTHROPATHY.value] = (
@@ -153,7 +145,7 @@ def initialize_transition_matrix(
             df.loc[state, Status.MINOR_BLEEDING.value] = weekly_eabr
             df.loc[state, Status.MAJOR_BLEEDING.value] = weekly_ajbr
             df.loc[state, Status.CRITICAL_BLEEDING.value] = weekly_albr
-            df.loc[state, Status.COMPLICATION.value] = COMPLICATION_PROB
+            df.loc[state, Status.COMPLICATION.value] = complication_prob
             df.loc[state, Status.INHIBITOR.value] = inhibitor_prob
         elif state == Status.COMPLICATION.value or state == Status.DEATH.value:
             df.loc[state, state] = 1.0
@@ -173,10 +165,21 @@ def initialize_transition_matrix(
             )
             df.loc[state] /= row_sum
         elif row_sum < 1:  # type: ignore
-            logger.debug(
-                f"{regime.value} {state} row sum {row_sum:.4f} < 1, adding to NO_BLEEDING"
-            )
-            df.loc[state, Status.NO_BLEEDING.value] += 1 - row_sum
+            if state == Status.CHRONIC_ARTHROPATHY.value:
+                logger.debug(
+                    f"{regime.value} {state} row sum {row_sum:.4f} < 1, adding to SEVERE_ARTHROPATHY"
+                )
+                df.loc[state, Status.SEVERE_ARTHROPATHY.value] += 1 - row_sum
+            elif state == Status.SEVERE_ARTHROPATHY.value:
+                logger.debug(
+                    f"{regime.value} {state} row sum {row_sum:.4f} < 1, adding to SEVERE_ARTHROPATHY"
+                )
+                df.loc[state, Status.SEVERE_ARTHROPATHY.value] += 1 - row_sum
+            else:
+                logger.debug(
+                    f"{regime.value} {state} row sum {row_sum:.4f} < 1, adding to NO_BLEEDING"
+                )
+                df.loc[state, Status.NO_BLEEDING.value] += 1 - row_sum
 
     # Log transition probabilities
     for state in states:

@@ -38,16 +38,12 @@ def calculate_average_abr_ajbr(
         state_path = result["state_path"]
         # Count transitions to bleeding states
         total_bleed_transitions = sum(
-            1
-            for i in range(1, len(state_path))
-            if state_path[i] in bleeding_states
-            and state_path[i - 1] not in bleeding_states
+            1 for i in range(1, len(state_path)) if state_path[i] in bleeding_states
         )
         joint_bleed_transitions = sum(
             1
             for i in range(1, len(state_path))
             if state_path[i] == Status.MAJOR_BLEEDING.value
-            and state_path[i - 1] != Status.MAJOR_BLEEDING.value
         )
         # Convert to annual rates
         abr = total_bleed_transitions / num_years
