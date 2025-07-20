@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from model.constants import HUMAN_DERIVED_FACTOR_VIII_PER_UNIT_PRICE_RIAL
 from enum import Enum
 
 
@@ -7,16 +8,66 @@ class Regimes(Enum):
     PROPHYLAXIS = "prophylaxis"
 
 
-class Status(Enum):
+class BaseStates(Enum):
     NO_BLEEDING = "alive_wo_arthropathy"
     SEVERE_ARTHROPATHY = "severe_arthropathy"
     CHRONIC_ARTHROPATHY = "chronic_arthropathy"
+
+
+class States(Enum):
     MINOR_BLEEDING = "minor_bleeding"
     MAJOR_BLEEDING = "articular_bleeding"
-    CRITICAL_BLEEDING = "surgery_or_injury"
-    COMPLICATION = "complication_infection"
+    LT_BLEEDING = "life_treating_bleeding"
+    SURGERY = "surgery"
+    REPLACEMENT = "joint_replacement"
     INHIBITOR = "inhibitor"
     DEATH = "death"
+
+
+EARLY_STATES = [
+    BaseStates.NO_BLEEDING,
+    States.MINOR_BLEEDING,
+    States.MAJOR_BLEEDING,
+    States.LT_BLEEDING,
+    States.SURGERY,
+    States.INHIBITOR,
+    States.DEATH,
+    BaseStates.CHRONIC_ARTHROPATHY,
+]
+
+INTERMEDIATE_STATES = [
+    BaseStates.CHRONIC_ARTHROPATHY,
+    States.MINOR_BLEEDING,
+    States.MAJOR_BLEEDING,
+    States.LT_BLEEDING,
+    States.SURGERY,
+    States.INHIBITOR,
+    States.DEATH,
+    BaseStates.SEVERE_ARTHROPATHY,
+]
+
+END_STATES = [
+    BaseStates.SEVERE_ARTHROPATHY,
+    States.MINOR_BLEEDING,
+    States.MAJOR_BLEEDING,
+    States.LT_BLEEDING,
+    States.SURGERY,
+    States.INHIBITOR,
+    States.REPLACEMENT,
+    States.DEATH,
+]
+
+
+class Model:
+    def __init__(self, stage: str, states: list[Enum]) -> None:
+        self.stage = stage
+        self.states = states
+        self.states_value = [state.value for state in states]
+
+
+EARLY_MODEL = Model("early", EARLY_STATES)
+INTERMEDIATE_MODEL = Model("intermediate", INTERMEDIATE_STATES)
+END_MODEL = Model("end", END_STATES)
 
 
 @dataclass
@@ -41,3 +92,4 @@ class Treatment:
     ajbr: float  # Annual joint bleeding rate
     albr: float  # Annual life-threatening bleeding rate
     eabr: float  # Annual extra-articular bleeding rate
+    price_per_unit: float = HUMAN_DERIVED_FACTOR_VIII_PER_UNIT_PRICE_RIAL

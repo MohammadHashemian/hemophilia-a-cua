@@ -1,6 +1,6 @@
 import numpy as np
-from typing import List, Union
-from model.schemas import Regimes, Status, Treatment
+from typing import List
+from model.schemas import Regimes, States, Treatment, Model
 import math
 
 
@@ -13,6 +13,7 @@ class MarkovChain:
         transition_matrix: List[List[float]],
         initial_state_probs: List[float],
         treatment: Treatment,
+        model: Model,
         price_per_unit: float = 58_000,  # Cost per IU in Rial
         regime: Regimes = Regimes.ON_DEMAND,
     ):
@@ -24,8 +25,9 @@ class MarkovChain:
             transition_matrix: 2D list representing the transition probabilities.
             initial_state_probs: Initial state probability distribution.
             treatment: Treatment object containing dosing and bleeding rates.
-            price_per_unit: Cost per unit of factor VIII (Rial/IU).
+            price_per_unit: Cost per unit of factor VIII (Rial).
             regime: Treatment regime (ON_DEMAND or PROPHYLAXIS).
+            model: Model defining the states (optional, for logging).
         """
         self.states = states
         self.transition_matrix = np.array(transition_matrix)
@@ -33,6 +35,7 @@ class MarkovChain:
         self.treatment = treatment
         self.price_per_unit = price_per_unit
         self.regime = regime
+        self.model = model  # Store model for logging
         self.inhibitor_weeks = 0  # Track weeks spent in inhibitor state
         # Validate inputs
         if len(states) != len(transition_matrix):
@@ -80,7 +83,7 @@ class MarkovChain:
         Calculate total factor VIII dose (IU) and cost (Rial) for a week based on state and age.
 
         Args:
-            state: Current state (e.g., articular_bleeding, minor_bleeding, surgery_or_injury_or_infection).
+            state: Current state (e.g., articular_bleeding, minor_bleeding, surgery).
             age_weeks: Age in weeks for body weight calculation.
 
         Returns:
@@ -88,48 +91,48 @@ class MarkovChain:
         """
         body_weight = self.get_body_weight(age_weeks)
 
-        if state == Status.MAJOR_BLEEDING.value:  # articular_bleeding
+        if state == States.MAJOR_BLEEDING.value:
             dose_per_kg = self.treatment.dose_joint
             duration = self.treatment.duration_joint
-        elif state == Status.MINOR_BLEEDING.value:  # minor_bleeding
+        elif state == States.MINOR_BLEEDING.value:
             total_freq = 0.05 + 0.1
             dose_per_kg = (
                 0.05 * self.treatment.dose_muscle + 0.1 * self.treatment.dose_mucous
-            ) / total_freq  # 27.167 IU/kg
+            ) / total_freq
             duration = (
                 0.05 * self.treatment.duration_muscle
                 + 0.1 * self.treatment.duration_mucous
-            ) / total_freq  # 3.667 days
-        elif state == Status.CRITICAL_BLEEDING.value:  # surgery_or_injury_or_infection
+            ) / total_freq
+        elif state == States.LT_BLEEDING.value:
             total_freq = 0.015 + 0.01 + 0.02
             dose_per_kg = (
                 0.015 * self.treatment.dose_intracranial
                 + 0.01 * self.treatment.dose_neck_throat
                 + 0.02 * self.treatment.dose_gastro
-            ) / total_freq  # 37.111 IU/kg
+            ) / total_freq
             duration = (
                 0.015 * self.treatment.duration_intracranial
                 + 0.01 * self.treatment.duration_neck_throat
                 + 0.02 * self.treatment.duration_gastro
-            ) / total_freq  # 15.222 days
-        elif state == Status.INHIBITOR.value:  # inhibitor
+            ) / total_freq
+        elif state == States.INHIBITOR.value:
             total_freq = 0.05 + 0.1
             dose_per_kg = (
                 0.05 * self.treatment.dose_muscle + 0.1 * self.treatment.dose_mucous
-            ) / total_freq  # 27.167 IU/kg
+            ) / total_freq
             duration = (
                 0.05 * self.treatment.duration_muscle
                 + 0.1 * self.treatment.duration_mucous
-            ) / total_freq  # 3.667 days
+            ) / total_freq
         else:
             return (
                 0.0,
                 0.0,
             )  # No injections for non-bleed states (e.g., alive_wo_arthropathy, chronic_arthropathy, etc.)
 
-        num_injections = math.ceil(duration)  # One injection per day, rounded up
+        num_injections = math.ceil(duration)
         total_dose = dose_per_kg * body_weight * num_injections
-        total_cost = total_dose * self.price_per_unit
+        total_cost = total_dose * self.treatment.price_per_unit
         return round(total_dose, 2), round(total_cost, 2)
 
     def simulate(self, num_steps: int) -> dict:
@@ -146,21 +149,7 @@ class MarkovChain:
         weekly_doses = []
         weekly_costs = []
         current_state = np.random.choice(self.states, p=self.initial_state_probs)
-        self.inhibitor_weeks = 0  # Reset inhibitor weeks
-
-        # ITI success probabilities based on regime
-        if self.regime == Regimes.ON_DEMAND:
-            iti_success_probs = {
-                Status.NO_BLEEDING.value: 0.2,  # 20% to alive_wo_arthropathy
-                Status.CHRONIC_ARTHROPATHY.value: 0.5,  # 50% to chronic_arthropathy
-                Status.SEVERE_ARTHROPATHY.value: 0.3,  # 30% to severe_arthropathy
-            }
-        else:  # PROPHYLAXIS
-            iti_success_probs = {
-                Status.NO_BLEEDING.value: 0.6,  # 60% to alive_wo_arthropathy
-                Status.CHRONIC_ARTHROPATHY.value: 0.3,  # 30% to chronic_arthropathy
-                Status.SEVERE_ARTHROPATHY.value: 0.1,  # 10% to severe_arthropathy
-            }
+        self.inhibitor_weeks = 0
 
         for week in range(num_steps):
             state_path.append(current_state)
@@ -168,31 +157,15 @@ class MarkovChain:
             weekly_doses.append(dose)
             weekly_costs.append(cost)
 
-            # Update inhibitor weeks
-            if current_state == Status.INHIBITOR.value:
+            if current_state == States.INHIBITOR.value:
                 self.inhibitor_weeks += 1
             else:
-                self.inhibitor_weeks = 0  # Reset if not in inhibitor state
+                self.inhibitor_weeks = 0
 
-            # Handle ITI after 26 weeks
-            if current_state == Status.INHIBITOR.value and self.inhibitor_weeks >= 26:
-                # 80% chance of ITI success
-                if np.random.random() < 0.8:
-                    # Choose target state based on iti_success_probs
-                    target_states = list(iti_success_probs.keys())
-                    target_probs = list(iti_success_probs.values())
-                    current_state = np.random.choice(target_states, p=target_probs)
-                    self.inhibitor_weeks = 0  # Reset after success
-                else:
-                    # ITI failure: stay in inhibitor, reset for another 6 months
-                    self.inhibitor_weeks = 0
-                    current_state = Status.INHIBITOR.value
-            else:
-                # Normal state transition
-                current_state_idx = self.states.index(current_state)
-                current_state = np.random.choice(
-                    self.states, p=self.transition_matrix[current_state_idx]
-                )
+            current_state_idx = self.states.index(current_state)
+            current_state = np.random.choice(
+                self.states, p=self.transition_matrix[current_state_idx]
+            )
 
         return {
             "state_path": state_path,

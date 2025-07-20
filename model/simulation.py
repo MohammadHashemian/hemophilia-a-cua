@@ -5,7 +5,13 @@ from model.treatments import initialize_treatments
 from model.transition_matrix import initialize_transition_matrix
 from model.analysis import calculate_average_abr_ajbr, visualize_results
 from model.markov import MarkovChain
-from model.schemas import Regimes, Status
+from model.schemas import (
+    Regimes,
+    BaseStates,
+    EARLY_MODEL,
+    INTERMEDIATE_MODEL,
+    END_MODEL,
+)
 from model.constants import (
     NUMBER_OF_CYCLES,
     HUMAN_DERIVED_FACTOR_VIII_PER_UNIT_PRICE_RIAL,
@@ -14,20 +20,10 @@ import numpy as np
 import asyncio
 import multiprocessing
 from multiprocessing import Pool
-from tqdm.asyncio import tqdm
+import enlighten
 import time
 
 logger = get_logger()
-
-
-import enlighten
-import multiprocessing
-import asyncio
-from multiprocessing import Pool
-import time
-import logging
-
-logger = logging.getLogger(__name__)
 
 
 def run_simulation(args):
@@ -44,13 +40,15 @@ async def run_simulations(markov_chain: MarkovChain, num_steps: int, num_runs: i
     start_total = time.time()
     num_processes = min(multiprocessing.cpu_count(), 4)
     logger.info(
-        f"Using {num_processes} processes for {markov_chain.regime.value} simulations"
+        f"Using {num_processes} processes for {markov_chain.regime.value} {markov_chain.model.stage} simulations"
     )
 
     # Initialize Enlighten progress bar
     manager = enlighten.get_manager()
     pbar: Counter = manager.counter(
-        total=num_runs, desc=f"Simulating {markov_chain.regime.value}", leave=True
+        total=num_runs,
+        desc=f"Simulating {markov_chain.regime.value} {markov_chain.model.stage}",
+        leave=True,
     )
 
     def update_pbar(_):
@@ -74,86 +72,128 @@ async def run_simulations(markov_chain: MarkovChain, num_steps: int, num_runs: i
     manager.stop()
 
     logger.info(
-        f"Total simulation time for {markov_chain.regime.value}: {time.time() - start_total:.2f} seconds"
+        f"Total simulation time for {markov_chain.regime.value} {markov_chain.model.stage}: {time.time() - start_total:.2f} seconds"
     )
     return results
 
 
 def run():
-    """Main function to run the Markov chain simulation for hemophilia A."""
-    od_matrix_path = PROJECT_ROOT / "data" / "processed" / "od_transition_matrix.csv"
-    pro_matrix_path = PROJECT_ROOT / "data" / "processed" / "pro_transition_matrix.csv"
+    """Main function to run the Markov chain simulation for hemophilia A across all models and regimes."""
+    # Define paths for transition matrices
+    matrix_paths = {
+        (Regimes.ON_DEMAND, "early"): PROJECT_ROOT
+        / "data"
+        / "processed"
+        / "od_early_transition_matrix.csv",
+        (Regimes.ON_DEMAND, "intermediate"): PROJECT_ROOT
+        / "data"
+        / "processed"
+        / "od_intermediate_transition_matrix.csv",
+        (Regimes.ON_DEMAND, "end"): PROJECT_ROOT
+        / "data"
+        / "processed"
+        / "od_end_transition_matrix.csv",
+        (Regimes.PROPHYLAXIS, "early"): PROJECT_ROOT
+        / "data"
+        / "processed"
+        / "pro_early_transition_matrix.csv",
+        (Regimes.PROPHYLAXIS, "intermediate"): PROJECT_ROOT
+        / "data"
+        / "processed"
+        / "pro_intermediate_transition_matrix.csv",
+        (Regimes.PROPHYLAXIS, "end"): PROJECT_ROOT
+        / "data"
+        / "processed"
+        / "pro_end_transition_matrix.csv",
+    }
+
+    # Initialize treatments
     treatments = initialize_treatments()
-    states = [state.value for state in Status]
-    od_matrix = initialize_transition_matrix(od_matrix_path, Regimes.ON_DEMAND)
-    pro_matrix = initialize_transition_matrix(pro_matrix_path, Regimes.PROPHYLAXIS)
-    od_matrix = od_matrix.to_numpy()
-    pro_matrix = pro_matrix.to_numpy()
 
-    initial_state_probs = np.zeros(len(states))
-    no_bleeding_idx = states.index(Status.NO_BLEEDING.value)
-    initial_state_probs[no_bleeding_idx] = 1.0
+    # Define models
+    models = {
+        "early": EARLY_MODEL,
+        "intermediate": INTERMEDIATE_MODEL,
+        "end": END_MODEL,
+    }
 
-    od_markov_chain = MarkovChain(
-        states=states,
-        transition_matrix=od_matrix.tolist(),
-        initial_state_probs=initial_state_probs.tolist(),
-        treatment=treatments[Regimes.ON_DEMAND],
-        price_per_unit=HUMAN_DERIVED_FACTOR_VIII_PER_UNIT_PRICE_RIAL,
-        regime=Regimes.ON_DEMAND,
-    )
-    pro_markov_chain = MarkovChain(
-        states=states,
-        transition_matrix=pro_matrix.tolist(),
-        initial_state_probs=initial_state_probs.tolist(),
-        treatment=treatments[Regimes.PROPHYLAXIS],
-        price_per_unit=HUMAN_DERIVED_FACTOR_VIII_PER_UNIT_PRICE_RIAL,
-        regime=Regimes.PROPHYLAXIS,
-    )
-
-    logger.info("Starting Markov chain simulation with dose and cost calculations")
+    # Generate transition matrices and run simulations
+    results = {}
     num_steps = NUMBER_OF_CYCLES
     num_runs = 100
     num_years = num_steps / 52
 
-    od_results = asyncio.run(run_simulations(od_markov_chain, num_steps, num_runs))
-    pro_results = asyncio.run(run_simulations(pro_markov_chain, num_steps, num_runs))
+    for regime in [Regimes.ON_DEMAND, Regimes.PROPHYLAXIS]:
+        for model_name, model in models.items():
+            # Generate transition matrix
+            matrix_path = matrix_paths[(regime, model_name)]
+            transition_matrix = initialize_transition_matrix(
+                matrix_path, regime, model, override=True
+            )
+            states = model.states_value
+            transition_matrix_np = transition_matrix.to_numpy()
 
-    od_avg_abr, od_avg_ajbr = calculate_average_abr_ajbr(
-        od_results, num_years, Regimes.ON_DEMAND
-    )
-    pro_avg_abr, pro_avg_ajbr = calculate_average_abr_ajbr(
-        pro_results, num_years, Regimes.PROPHYLAXIS
-    )
-    logger.info(
-        f"Average ABR over {num_years:.2f} years: "
-        f"On-demand = {od_avg_abr:.2f} bleeds/year, Prophylaxis = {pro_avg_abr:.2f} bleeds/year"
-    )
-    logger.info(
-        f"Average AJBR over {num_years:.2f} years: "
-        f"On-demand = {od_avg_ajbr:.2f} joint bleeds/year, Prophylaxis = {pro_avg_ajbr:.2f} joint bleeds/year"
-    )
+            # Set initial state probabilities (start in NO_BLEEDING)
+            initial_state_probs = np.zeros(len(states))
+            no_bleeding_idx = (
+                states.index(BaseStates.NO_BLEEDING.value)
+                if BaseStates.NO_BLEEDING.value in states
+                else 0
+            )
+            initial_state_probs[no_bleeding_idx] = 1.0
 
-    total_dose_od = np.mean([sum(r["weekly_doses"]) for r in od_results])
-    total_cost_od = np.mean([sum(r["weekly_costs"]) for r in od_results])
-    total_dose_pro = np.mean([sum(r["weekly_doses"]) for r in pro_results])
-    total_cost_pro = np.mean([sum(r["weekly_costs"]) for r in pro_results])
-    logger.info(
-        f"Average total factor VIII dose over {num_years:.2f} years: "
-        f"On-demand = {total_dose_od:.2f} IU, Prophylaxis = {total_dose_pro:.2f} IU"
-    )
-    logger.info(
-        f"Average total cost over {num_years:.2f} years: "
-        f"On-demand = {total_cost_od:.2f} Rial, Prophylaxis = {total_cost_pro:.2f} Rial"
-    )
+            # Initialize MarkovChain with model
+            markov_chain = MarkovChain(
+                states=states,
+                transition_matrix=transition_matrix_np.tolist(),
+                initial_state_probs=initial_state_probs.tolist(),
+                treatment=treatments[regime],
+                price_per_unit=HUMAN_DERIVED_FACTOR_VIII_PER_UNIT_PRICE_RIAL,
+                regime=regime,
+                model=model,  # Pass model for logging
+            )
 
-    for week in range(min(num_steps, 5)):
-        logger.debug(
-            f"Week {week}, Age {week/52:.2f} years, "
-            f"OD State: {od_results[0]['state_path'][week]}, OD Dose: {od_results[0]['weekly_doses'][week]} IU, "
-            f"OD Cost: {od_results[0]['weekly_costs'][week]} Rial, "
-            f"PRO State: {pro_results[0]['state_path'][week]}, PRO Dose: {pro_results[0]['weekly_doses'][week]} IU, "
-            f"PRO Cost: {pro_results[0]['weekly_costs'][week]} Rial"
-        )
+            logger.info(
+                f"Starting Markov chain simulation for {regime.value} {model_name}"
+            )
+            sim_results = asyncio.run(
+                run_simulations(markov_chain, num_steps, num_runs)
+            )
+            results[(regime, model_name)] = sim_results
 
-    visualize_results(od_results, pro_results, states)
+            # Calculate ABR and AJBR
+            avg_abr, avg_ajbr = calculate_average_abr_ajbr(
+                sim_results, num_years, regime
+            )
+            logger.info(
+                f"{regime.value} {model_name}: Average ABR over {num_years:.2f} years: {avg_abr:.2f} bleeds/year, "
+                f"Average AJBR: {avg_ajbr:.2f} joint bleeds/year"
+            )
+
+            # Calculate total dose and cost
+            total_dose = np.mean([sum(r["weekly_doses"]) for r in sim_results])
+            total_cost = np.mean([sum(r["weekly_costs"]) for r in sim_results])
+            logger.info(
+                f"{regime.value} {model_name}: Average total factor VIII dose over {num_years:.2f} years: {total_dose:.2f} IU, "
+                f"Average total cost: {total_cost:.2f} Rial"
+            )
+
+            # Log first few weeks
+            for week in range(min(num_steps, 5)):
+                logger.debug(
+                    f"{regime.value} {model_name} Week {week}, Age {week/52:.2f} years, "
+                    f"State: {sim_results[0]['state_path'][week]}, "
+                    f"Dose: {sim_results[0]['weekly_doses'][week]:.2f} IU, "
+                    f"Cost: {sim_results[0]['weekly_costs'][week]:.2f} Rial"
+                )
+
+    # Visualize results for each model
+    for model_name, model in models.items():
+        od_results = results.get((Regimes.ON_DEMAND, model_name), [])
+        pro_results = results.get((Regimes.PROPHYLAXIS, model_name), [])
+        if od_results and pro_results:
+            visualize_results(od_results, pro_results, model.states_value, model_name)
+
+
+if __name__ == "__main__":
+    run()
