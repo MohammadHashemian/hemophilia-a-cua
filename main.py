@@ -7,8 +7,9 @@ from src.data.loaders import (
     load_irc_data,
 )
 from src.processing.distribution_adjuster import adjust_age_distribution
-from model import simulation
+from model_dep import simulation
 from pathlib import Path
+import model.markov
 import numpy as np
 import typer
 
@@ -58,6 +59,19 @@ async def process(execute: bool):
 def markov():
     suppress_matplotlib_debug()
     simulation.run()
+
+
+@app.command(help="Runs new markov model simulation.")
+def new():
+    od_markov = model.markov.load_markov_chain(
+        io=PROJECT_ROOT / "data" / "OD_Transitions.xlsx",
+        sheet_name="data",
+        steps=5,
+        reward_function=model.markov.reward_function,
+    )
+    # Run and print the sequence
+    # np.random.seed(42)  # For reproducibility
+    print("State sequence:", od_markov.run())
 
 
 if __name__ == "__main__":

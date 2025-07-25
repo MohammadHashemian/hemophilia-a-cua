@@ -9,9 +9,9 @@ PROPHYLAXIS_ANNUAL_AJBR = 3.66  # Annual joint bleeding rate
 
 # Life-threatening bleeding rates (LTB)
 LIFE_THREATENING_BLEEDING_FRACTION = 0.045
-ON_DEMAND_ANNUAL_ALBR = (
+ON_DEMAND_ANNUAL_ALBR = round(
     ON_DEMAND_ANNUAL_ABR * LIFE_THREATENING_BLEEDING_FRACTION
-)  # 1.98 events/year
+)  # 1.98 events/year ~ rounded to 2
 PROPHYLAXIS_ANNUAL_ALBR = (
     PROPHYLAXIS_ANNUAL_ABR * LIFE_THREATENING_BLEEDING_FRACTION
 )  # 0.1692 events/year
@@ -19,17 +19,11 @@ PROPHYLAXIS_ANNUAL_ALBR = (
 # Extra-articular bleeding rates (Minor)
 EXTRA_ARTICULAR_BLEEDING_FRACTION = 0.15
 ON_DEMAND_ANNUAL_EABR = (
-    ON_DEMAND_ANNUAL_ABR * EXTRA_ARTICULAR_BLEEDING_FRACTION
-)  # 6.6 events/year
+    round(ON_DEMAND_ANNUAL_ABR * EXTRA_ARTICULAR_BLEEDING_FRACTION) + 1
+)  # 6.6 events/year ~ rounded to 8 to scale od probs
 PROPHYLAXIS_ANNUAL_EABR = (
     PROPHYLAXIS_ANNUAL_ABR * EXTRA_ARTICULAR_BLEEDING_FRACTION
 )  # 0.564 events/year
-
-# ITI-specific bleeding rates
-ITI_ANNUAL_ABR = 0.0
-ITI_ANNUAL_AJBR = 0.0
-ITI_ANNUAL_ALBR = 0.0
-ITI_ANNUAL_EABR = 0.0
 
 # Cost parameters
 HUMAN_DERIVED_FACTOR_VIII_PER_UNIT_PRICE_RIAL = (
@@ -38,6 +32,7 @@ HUMAN_DERIVED_FACTOR_VIII_PER_UNIT_PRICE_RIAL = (
 AVG_DOSE_PER_BLEED = 25.805  # Weighted average dose
 
 # Transition probabilities
+ITI_RESOLUTION_PROB = 0.0085  # Weekly Success Probability over 26 weak therapy
 BLEED_RESOLUTION_PROB = 0.95  # High to maximize bleeding episodes
 CRITICAL_BLEED_RESOLUTION_PROB = 0.95  # High for critical bleeds
 CRITICAL_BLEED_DEATH_PROB = 2.4e-5  # 0.5% annual ICH rate * 25% fatality / 52

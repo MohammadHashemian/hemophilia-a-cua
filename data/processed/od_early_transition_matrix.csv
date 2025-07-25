@@ -1,9 +1,0 @@
-states,alive_wo_arthropathy,minor_bleeding,articular_bleeding,life_treating_bleeding,surgery,inhibitor,death,chronic_arthropathy
-alive_wo_arthropathy,0,0.154522716,0.796026113,0.046356815,0,0.002800139,0,0.000294217
-minor_bleeding,0.99586,0,0,0,0,0.00414,0,0
-articular_bleeding,0.995425,0,0,0,0,0.00414,0,0.000435
-life_treating_bleeding,0.995836,0,0,0,0,0.00414,2.40E-05,0
-surgery,0.99586,0,0,0,0,0.00414,0,0
-inhibitor,0,0,0,0,0,1,0,0
-death,0,0,0,0,0,0,1,0
-chronic_arthropathy,0,0,0,0,0,0,0,1

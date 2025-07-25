@@ -1,5 +1,6 @@
-from model.schemas import Regimes, Treatment
-from model.constants import (
+from model_dep.schemas import Regimes, Treatment
+from src.utils.logger import get_logger
+from model_dep.constants import (
     ON_DEMAND_ANNUAL_ABR,
     ON_DEMAND_ANNUAL_AJBR,
     ON_DEMAND_ANNUAL_ALBR,
@@ -11,9 +12,17 @@ from model.constants import (
     AVG_DOSE_PER_BLEED,
 )
 
+logger = get_logger()
+
 
 def initialize_treatments() -> dict[Regimes, Treatment]:
     """Initialize treatment regimes with their respective parameters, converting daily durations to weekly."""
+    logger.debug(
+        f"OD Bleedings ABR: {ON_DEMAND_ANNUAL_ABR}, and AJBR + ALBR + EABR sums to: {ON_DEMAND_ANNUAL_AJBR + ON_DEMAND_ANNUAL_ALBR + ON_DEMAND_ANNUAL_EABR}"
+    )
+    logger.debug(
+        f"Prophylaxis Bleedings ABR: {PROPHYLAXIS_ANNUAL_ABR}, and AJBR + ALBR + EABR sums to: {PROPHYLAXIS_ANNUAL_AJBR + PROPHYLAXIS_ANNUAL_ALBR + PROPHYLAXIS_ANNUAL_EABR}"
+    )
     return {
         Regimes.ON_DEMAND: Treatment(
             name=Regimes.ON_DEMAND.value,

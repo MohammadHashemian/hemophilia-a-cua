@@ -1,18 +1,18 @@
 from enlighten import Counter
 from src.utils.logger import get_logger
 from src.data.loaders import PROJECT_ROOT
-from model.treatments import initialize_treatments
-from model.transition_matrix import initialize_transition_matrix
-from model.analysis import calculate_average_abr_ajbr, visualize_results
-from model.markov import MarkovChain
-from model.schemas import (
+from model_dep.treatments import initialize_treatments
+from model_dep.transition_matrix import initialize_transition_matrix
+from model_dep.analysis import calculate_average_abr_ajbr, visualize_results
+from model_dep.markov import MarkovChain
+from model_dep.schemas import (
     Regimes,
     BaseStates,
     EARLY_MODEL,
     INTERMEDIATE_MODEL,
     END_MODEL,
 )
-from model.constants import (
+from model_dep.constants import (
     NUMBER_OF_CYCLES,
     HUMAN_DERIVED_FACTOR_VIII_PER_UNIT_PRICE_RIAL,
 )
@@ -128,10 +128,11 @@ def run():
             # Generate transition matrix
             matrix_path = matrix_paths[(regime, model_name)]
             transition_matrix = initialize_transition_matrix(
-                matrix_path, regime, model, override=True
+                matrix_path, regime, model, treatments, override=False
             )
             states = model.states_value
             transition_matrix_np = transition_matrix.to_numpy()
+            model.update(transition_matrix_np.tolist())
 
             # Set initial state probabilities (start in NO_BLEEDING)
             initial_state_probs = np.zeros(len(states))

@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from model.constants import HUMAN_DERIVED_FACTOR_VIII_PER_UNIT_PRICE_RIAL
+from model_dep.constants import HUMAN_DERIVED_FACTOR_VIII_PER_UNIT_PRICE_RIAL
 from enum import Enum
 
 
@@ -58,16 +58,37 @@ END_STATES = [
 ]
 
 
-class Model:
-    def __init__(self, stage: str, states: list[Enum]) -> None:
+class BaseModel:
+    """
+    Args:
+        stage: Disease progression, [early, intermediate or end]
+        states: List of disease stage available states as Enum
+        states_value: List of disease stage as state.value returned
+    """
+
+    def __init__(
+        self,
+        stage: str,
+        states: list[Enum],
+        transition_matrix: list[float] | None = None,
+    ) -> None:
         self.stage = stage
         self.states = states
         self.states_value = [state.value for state in states]
+        self.transition_matrix = transition_matrix
+
+    def update(self, transition_matrix: list[float]):
+        """
+        Updates transition matrix with new values
+        """
+        # TODO: Validation here
+        self.transition_matrix = transition_matrix
+        return self
 
 
-EARLY_MODEL = Model("early", EARLY_STATES)
-INTERMEDIATE_MODEL = Model("intermediate", INTERMEDIATE_STATES)
-END_MODEL = Model("end", END_STATES)
+EARLY_MODEL = BaseModel("early", EARLY_STATES)
+INTERMEDIATE_MODEL = BaseModel("intermediate", INTERMEDIATE_STATES)
+END_MODEL = BaseModel("end", END_STATES)
 
 
 @dataclass

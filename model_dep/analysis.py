@@ -1,7 +1,7 @@
 from src.utils.logger import get_logger
 from src.data.loaders import PROJECT_ROOT
-from model.schemas import States, Regimes, BaseStates
-from model.treatments import initialize_treatments
+from model_dep.schemas import States, Regimes, BaseStates
+from model_dep.treatments import initialize_treatments
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
