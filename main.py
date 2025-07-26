@@ -63,15 +63,45 @@ def markov():
 
 @app.command(help="Runs new markov model simulation.")
 def new():
-    od_markov = model.markov.load_markov_chain(
-        io=PROJECT_ROOT / "data" / "OD_Transitions.xlsx",
-        sheet_name="data",
-        steps=5,
-        reward_function=model.markov.reward_function,
-    )
-    # Run and print the sequence
+    num_steps = 73 * 52
     # np.random.seed(42)  # For reproducibility
-    print("State sequence:", od_markov.run())
+
+    # On_Demand
+    on_demand = model.markov.load_markov_chain(
+        io=PROJECT_ROOT / "data" / "Transitions.xlsx",
+        sheet_name="on_demand",
+        steps=num_steps,
+    )
+    on_demand.add_reward_function(model.markov.on_demand_factor_consumption)
+    # Run and print the sequence
+
+    on_demand.run()
+    total_consumption = np.sum(
+        on_demand.collect_rewards()[model.markov.on_demand_factor_consumption.__name__]
+    )
+    annual_consumption = total_consumption / num_steps
+    print(
+        f"Total factor consumption: {total_consumption} with annual: {annual_consumption}"
+    )
+
+    # Prophylaxis
+    prophylaxis = model.markov.load_markov_chain(
+        io=PROJECT_ROOT / "data" / "Transitions.xlsx",
+        sheet_name="prophylaxis",
+        steps=73 * 52,
+    )
+    prophylaxis.add_reward_function(model.markov.prophylaxis_factor_consumption)
+    # Run and print the sequence
+    prophylaxis.run()
+    total_consumption = np.sum(
+        prophylaxis.collect_rewards()[
+            model.markov.prophylaxis_factor_consumption.__name__
+        ]
+    )
+    annual_consumption = total_consumption / num_steps
+    print(
+        f"Total factor consumption: {total_consumption} with annual: {annual_consumption}"
+    )
 
 
 if __name__ == "__main__":

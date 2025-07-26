@@ -1,5 +1,6 @@
 {
     "cSpell.words": [
+        "aebr",
         "AJBR",
         "ALBR",
         "allclose",
@@ -12,6 +13,7 @@
         "fontsize",
         "gastro",
         "Gompertz",
+        "Ishigami",
         "levelname",
         "linestyle",
         "mpatches",
@@ -20,7 +22,9 @@
         "nrows",
         "pbar",
         "probs",
+        "saltelli",
         "sharex",
+        "sobol",
         "suptitle",
         "xlabel",
         "xlim",

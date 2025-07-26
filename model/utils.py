@@ -1,3 +1,4 @@
+from typing import Literal
 from pathlib import Path
 import math
 import matplotlib.pyplot as plt
@@ -6,9 +7,26 @@ import numpy as np
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
 
-import math
+def probability_at_least_one_event(
+    rate: float, period: Literal["weekly", "annual"]
+) -> float:
+    """
+    Calculate the probability of at least one event occurring in a given period.
 
-import math
+    Args:
+        rate: Event rate (e.g., annual rate).
+        period: Time period ('annual' or 'weekly').
+
+    Returns:
+        Probability of at least one event.
+    """
+    if period == "weekly":
+        lambda_value = rate
+    elif period == "annual":
+        lambda_value = rate / 52  # Convert annual rate to weekly
+    else:
+        raise ValueError(f"Unsupported period: {period}")
+    return 1 - np.exp(-lambda_value)
 
 
 def cal_body_weight(week: int) -> float:
