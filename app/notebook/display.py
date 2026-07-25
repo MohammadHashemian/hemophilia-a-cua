@@ -1,27 +1,37 @@
 from pathlib import Path
 
-import pandas as pd
+import polars as pl
 
 from utils.logging import setup_root_logger
 
+__all__ = ["show"]
+
 
 def show(
-    df: pd.DataFrame,
+    df: pl.DataFrame,
     caption: str | None = None,
     format: dict | None = None,
     store: bool = False,
     options: dict = {},
 ) -> None:
-    """_summary_
+    """Render a polars DataFrame as a styled HTML table in the notebook.
+
+    The ``.style`` API is a pandas-only feature, so this helper converts
+    to pandas internally for rendering. Excel export also goes through
+    pandas (``excel_writer``); see ``app.notebook.excel_adapter`` for
+    the polars-friendly alternative.
 
     Args:
-        df (pd.DataFrame): _description_
-        caption (str | None, optional): _description_. Defaults to None.
-        format (dict | None, optional): _description_. Defaults to None.
-        store (bool, optional): _description_. Defaults to False.
-        options (dict | None, optional): _description_. Defaults to None.
+        df (pl.DataFrame): DataFrame to display.
+        caption (str | None, optional): Table caption. Defaults to None.
+        format (dict | None, optional): Per-column format dict. Defaults to None.
+        store (bool, optional): If True and ``options["storage"]`` is
+            provided, also export to Excel. Defaults to False.
+        options (dict, optional): Storage options. See example.
     """
-    style = df.style.set_table_attributes('style="font-size:12px; table-layout:fixed;"')
+    pdf = df.to_pandas()
+
+    style = pdf.style.set_table_attributes('style="font-size:12px; table-layout:fixed;"')
 
     if caption:
         style = style.set_caption(caption)
@@ -49,7 +59,7 @@ def show(
                         f"File {path} already exists. DataFrame not stored to avoid overwriting."
                     )
                     return
-                df.to_excel(**storage)
+                pdf.to_excel(**storage)
                 logger.info(f"DataFrame stored successfully at {path}")
             else:
                 logger.warning("Storage options not provided. DataFrame not stored.")

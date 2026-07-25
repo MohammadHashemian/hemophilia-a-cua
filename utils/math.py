@@ -1,8 +1,6 @@
 import math
 
 import numpy as np
-import pandas as pd
-import statsmodels.api as sm
 from numba import jit, njit
 from scipy.stats import poisson
 
@@ -184,82 +182,3 @@ def zero_truncated_mass_function(
     denominator = (math.exp(lam) - 1) * math.factorial(int(k))
     res = numerator / denominator
     return res
-
-
-def remove_outliers(
-    df: pd.DataFrame, endog_col: str, exog_col: str, threshold_factor: float = 4
-) -> pd.DataFrame:
-    """
-    Helper function to remove outliers, supports pandas dataframe
-    """
-    X_constant = sm.add_constant(df[exog_col])
-    ols = sm.OLS(endog=df[endog_col], exog=X_constant).fit()
-    cooks_d = ols.get_influence().cooks_distance[0]
-    threshold = threshold_factor / len(df)
-    mask = cooks_d <= threshold
-
-    filtered_df = df[mask]
-    # Print number of outliers removed
-    print(f"Removing {len(df) - len(filtered_df)} outliers")
-    return filtered_df
-
-
-def remove_outliers_robust(
-    df: pd.DataFrame, endog_col: str, exog_col: str, threshold_factor: float = 4
-) -> pd.DataFrame:
-    """
-    Helper function to remove outliers using robust linear regression, supports pandas dataframe.
-
-    Parameters:
-    -----------
-    df : pd.DataFrame
-        Input dataframe containing the endogenous and exogenous variables.
-    endog_col : str
-        Name of the column containing the dependent variable.
-    exog_col : str
-        Name of the column containing the independent variable.
-    threshold_factor : float, optional
-        Factor to determine the threshold for outlier detection (default is 4).
-
-    Returns:
-    --------
-    pd.DataFrame
-        Dataframe with outliers removed based on approximate Cook's distance.
-    """
-    # Add constant term for intercept
-    X_constant = sm.add_constant(df[exog_col])
-
-    # Fit robust linear model using RLM with M-estimator (HuberT is default)
-    rlm = sm.RLM(endog=df[endog_col], exog=X_constant, M=sm.robust.norms.HuberT()).fit()
-
-    # Calculate approximate Cook's distance for robust regression
-    # Get standardized residuals
-    resid = rlm.resid / rlm.scale
-
-    # Calculate leverage (hat matrix diagonal)
-    hat_matrix_diag = np.diag(
-        rlm.model.exog
-        @ np.linalg.pinv(rlm.model.exog.T @ rlm.model.exog)
-        @ rlm.model.exog.T
-    )
-
-    # Approximate Cook's distance: (standardized residual)^2 * leverage / (p * (1 - leverage))
-    p = X_constant.shape[1]  # Number of parameters
-    cooks_d_approx = (resid**2 * hat_matrix_diag) / (
-        p * (1 - hat_matrix_diag + 1e-10)
-    )  # Add small constant to avoid division by zero
-
-    # Set threshold for outlier detection
-    threshold = threshold_factor / len(df)
-    mask = cooks_d_approx <= threshold
-
-    # Filter dataframe to remove outliers
-    filtered_df = df[mask]
-
-    # Print number of outliers removed
-    print(f"Removing {len(df) - len(filtered_df)} outliers")
-
-    return filtered_df
-
-
-

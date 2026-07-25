@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Literal
 
 import enlighten
-import pandas as pd
+import polars as pl
 
 from app.domain.inputs import ModelInput
 from app.domain.scenario import ScenarioBundle
@@ -128,6 +128,111 @@ def _run_batch(
     return results
 
 
+class _ValidationErrors:
+    NO_BUNDLES = "No scenario bundles supplied; nothing to simulate."
+    INVALID_BATCH_SIZE = (
+        "batch_size must be a positive integer, got %r."
+    )
+    INVALID_OUTPUT_DIR = "Output directory %s is not writable."
+    INVALID_TEMP_DIR = "Temp directory %s is not writable."
+    INVALID_ENGINE = (
+        "engine must be one of 'pathos', 'multiprocessing', 'batch' (got %r)."
+    )
+    NO_BATCH_WORKER = (
+        "engine='batch' requires batch_worker_function; none was supplied."
+    )
+    SCHEMA_MISMATCH = (
+        "build_df produced a different schema for the first batch of each "
+        "scenarios group. The downstream pl.concat would fail. "
+        "First batch: %s. Mismatched batch: %s."
+    )
+
+
+def validate_simulation_inputs(
+    bundles: list[ScenarioBundle[ModelInput]],
+    *,
+    context: ModelContext,
+    identity_chain: Chain,
+    batch_size: int,
+    output_dir: Path,
+    temp_dir: Path,
+    engine: Literal["pathos", "multiprocessing", "batch"],
+    batch_worker_function: Callable | None,
+) -> None:
+    """Pre-flight validation for ``run_scenarios_in_batches``.
+
+    Runs **before** any simulation kicks off so that schema mismatches,
+    missing directories, or invalid arguments surface immediately as
+    a clear ``ValueError`` (or ``FileNotFoundError`` for the
+    directory checks) instead of an opaque ``SchemaError`` minutes
+    into the run.
+
+    The check is intentionally cheap: it does **not** run any
+    simulation, but it does dry-run ``build_df`` on the first bundle
+    of each distinct scenario name and confirms the resulting
+    DataFrames share a single schema. That is the failure mode that
+    bit the PSA run (a batch with no ``extension`` values produced
+    ``Null``-typed columns while a batch with extension values
+    produced ``String``-typed columns).
+    """
+    if not bundles:
+        raise ValueError(_ValidationErrors.NO_BUNDLES)
+    if not isinstance(batch_size, int) or batch_size <= 0:
+        raise ValueError(_ValidationErrors.INVALID_BATCH_SIZE % (batch_size,))
+    if engine not in ("pathos", "multiprocessing", "batch"):
+        raise ValueError(_ValidationErrors.INVALID_ENGINE % (engine,))
+    if engine == "batch" and batch_worker_function is None:
+        raise ValueError(_ValidationErrors.NO_BATCH_WORKER)
+
+    if not output_dir.exists():
+        output_dir.mkdir(parents=True, exist_ok=True)
+    probe = output_dir / ".write_probe"
+    try:
+        probe.touch()
+        probe.unlink()
+    except OSError as exc:
+        raise OSError(_ValidationErrors.INVALID_OUTPUT_DIR, output_dir) from exc
+
+    if not temp_dir.exists():
+        temp_dir.mkdir(parents=True, exist_ok=True)
+    probe = temp_dir / ".write_probe"
+    try:
+        probe.touch()
+        probe.unlink()
+    except OSError as exc:
+        raise OSError(_ValidationErrors.INVALID_TEMP_DIR, temp_dir) from exc
+
+    # Schema dry-run. We do not actually simulate; we use a synthetic
+    # "empty" batch per unique scenario name. build_df handles an
+    # empty input list by returning an empty DataFrame with the right
+    # column names, so the schema check is meaningful.
+    seen_schemas: dict[str, dict[str, pl.DataType]] = {}
+    for bundle in bundles:
+        scenario_name = getattr(bundle.scenario, "name", str(bundle.scenario))
+        if scenario_name in seen_schemas:
+            continue
+        try:
+            probe_df = build_df(results=[], context=context)
+        except Exception as exc:  # pragma: no cover - defensive
+            raise RuntimeError(
+                f"build_df dry-run failed for scenario '{scenario_name}': {exc}"
+            ) from exc
+        seen_schemas[scenario_name] = dict(probe_df.schema)
+
+    schemas = list(seen_schemas.values())
+    if schemas and not all(s == schemas[0] for s in schemas):
+        first_name, first_schema = next(iter(seen_schemas.items()))
+        bad_name, bad_schema = next(
+            (name, schema)
+            for name, schema in seen_schemas.items()
+            if schema != first_schema
+        )
+        raise ValueError(
+            _ValidationErrors.SCHEMA_MISMATCH.format(first_schema, bad_schema)
+            + f" (scenarios: '{first_name}' vs '{bad_name}')"
+        )
+
+
 def run_scenarios_in_batches(
     bundles: list[ScenarioBundle[ModelInput]],
     context: ModelContext,
@@ -150,13 +255,31 @@ def run_scenarios_in_batches(
     """
 
     logger = setup_root_logger()
+
+    # Pre-flight validation. Runs before any simulation work so
+    # configuration / schema issues fail fast with a clear error
+    # rather than mid-run (e.g. the
+    # ``SchemaError: type String is incompatible with Null`` that
+    # used to surface in the per-batch pl.concat after ~20 minutes
+    # of PSA simulation).
+    validate_simulation_inputs(
+        bundles=bundles,
+        context=context,
+        identity_chain=identity_chain,
+        batch_size=batch_size,
+        output_dir=output_dir,
+        temp_dir=temp_dir,
+        engine=engine,
+        batch_worker_function=batch_worker_function,
+    )
+
     logger.info(
         _Info.STARTING_BATCH_RUNNER,
         len(bundles),
         batch_size,
         engine,
     )
-    use_cached_temp: bool = options.get("use_cached_temp", False)
+    use_cached_temp: bool = options.get("use_cache_temp", False)
 
     if not output_dir.exists():
         logger.info(_Errors.MISSING_OUT_DIR, output_dir)
@@ -211,13 +334,13 @@ def run_scenarios_in_batches(
                 batch_df = build_df(results=batch_results, context=context)
             except Exception:
                 logger.exception(_Errors.FAILED_TO_BUILD_DF)
-                batch_df = pd.DataFrame()
+                batch_df = pl.DataFrame()
 
             # save temp batch file
-            if not batch_df.empty:
+            if not batch_df.is_empty():
                 temp_path = temp_dir / f"batch_{index}.parquet"
                 try:
-                    batch_df.to_parquet(temp_path, index=False)
+                    batch_df.write_parquet(temp_path)
                     temp_files.append(temp_path)
                     logger.info(_Info.SAVED_BATCH, index, temp_path)
                 except Exception as e:
@@ -251,20 +374,21 @@ def run_scenarios_in_batches(
     # Step 2: Read all temp files and combine by scenario pair
     logger.info(_Info.COMBINING_TEMP_BATCHES, len(temp_files))
     if temp_files:
-        all_results_df = pd.concat(
-            [pd.read_parquet(f) for f in temp_files], axis=0, ignore_index=True
+        all_results_df = pl.concat(
+            [pl.read_parquet(f) for f in temp_files],
+            how="vertical",
         )
     else:
-        all_results_df = pd.DataFrame()
+        all_results_df = pl.DataFrame()
 
-    if all_results_df.empty:
+    if all_results_df.is_empty():
         logger.warning(_Errors.NO_RESULTS_COMBINED)
         return []
 
     # Optional debug output: keep combined data for inspection if needed
     combined_path = output_dir / "all_results_combined.parquet"
     try:
-        all_results_df.to_parquet(combined_path, index=False)
+        all_results_df.write_parquet(combined_path)
         logger.info(_Info.SAVED_COMBINED_RESULTS, combined_path)
     except Exception:
         logger.exception(_Errors.FAILED_TO_SAVE_COMBINED_RESULTS, combined_path)
@@ -272,7 +396,7 @@ def run_scenarios_in_batches(
     # Step 3: Group and write per-pair parquet files
     saved_files = []
     try:
-        all_pairs = pair_scenarios(all_results_df["scenario"].unique().tolist())
+        all_pairs = pair_scenarios(all_results_df["scenario"].unique().to_list())
     except Exception:
         logger.exception(_Errors.FAILED_TO_PAIR)
         raise
@@ -281,29 +405,27 @@ def run_scenarios_in_batches(
         logger.warning(_Errors.NO_PAIRS_FOUND)
 
     for control, intervention in all_pairs:
-        control_df = all_results_df[all_results_df["scenario"] == control]
-        intervention_df = all_results_df[all_results_df["scenario"] == intervention]
+        control_df = all_results_df.filter(pl.col("scenario") == control)
+        intervention_df = all_results_df.filter(pl.col("scenario") == intervention)
 
-        if control_df.empty or intervention_df.empty:
+        if control_df.is_empty() or intervention_df.is_empty():
             logger.warning(_Errors.SKIPPING_PAIR, control, intervention)
             continue
 
         # combine into a single file with a column indicating arm
-        control_df = control_df.copy()
-        intervention_df = intervention_df.copy()
-        control_df["arm"] = "control"
-        intervention_df["arm"] = "intervention"
+        control_df = control_df.with_columns(pl.lit("control").alias("arm"))
+        intervention_df = intervention_df.with_columns(pl.lit("intervention").alias("arm"))
 
-        combined = pd.concat([control_df, intervention_df], axis=0, ignore_index=True)
+        combined = pl.concat([control_df, intervention_df], how="vertical")
 
         fname = f"{_safe_name(control)}_vs_{_safe_name(intervention)}.parquet"
         path = output_dir / fname
         try:
-            combined.to_parquet(path, index=False)
+            combined.write_parquet(path)
             saved_files.append(path)
             logger.info(_Info.SAVED_PAIR_RESULTS, control, intervention, path)
         except Exception:
-            logger.exception(_Errors.FAILED_TO_SAVE_PAIR_RESULTS, path)
+            logger.exception(_Errors.FAILED_TO_SAVE_PAIR_RESULTS, control, intervention, path)
 
     # Step 4: Clean up temp files
     try:

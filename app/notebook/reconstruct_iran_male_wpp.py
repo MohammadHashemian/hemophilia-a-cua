@@ -21,7 +21,7 @@ from __future__ import annotations
 import csv
 from pathlib import Path
 
-import pandas as pd
+import polars as pl
 
 ROOT = Path(__file__).resolve().parents[1]
 WPP_CSV = ROOT / "data" / "raw" / "population-un-data-portal-iran.csv"
@@ -56,68 +56,93 @@ ABRIDGED_BUCKETS = [
 ]
 
 
-def reconstruct_male_abridged() -> pd.DataFrame:
-    df = pd.read_csv(WPP_CSV)
-    both = (
-        df[(df["IndicatorId"] == 80) & (df["Sex"] == "Both sexes") & (df["Time"] == YEAR)]
-        .set_index("AgeStart")["Value"]
-        .astype(float)
+def reconstruct_male_abridged() -> pl.DataFrame:
+    """Recover Male single-year mortality rates from Both + Female + population.
+
+    Returns a single-column polars DataFrame with columns
+    ``AgeStart`` (Int64) and ``value`` (Float64), sorted by ``AgeStart``.
+    """
+    df = pl.read_csv(WPP_CSV)
+    mask_80_year = (pl.col("IndicatorId") == 80) & (pl.col("Time") == YEAR)
+
+    both = df.filter(mask_80_year & (pl.col("Sex") == "Both sexes")).select(
+        pl.col("AgeStart").cast(pl.Int64),
+        pl.col("Value").cast(pl.Float64).alias("value"),
     )
-    female = (
-        df[(df["IndicatorId"] == 80) & (df["Sex"] == "Female") & (df["Time"] == YEAR)]
-        .set_index("AgeStart")["Value"]
-        .astype(float)
+    female = df.filter(mask_80_year & (pl.col("Sex") == "Female")).select(
+        pl.col("AgeStart").cast(pl.Int64),
+        pl.col("Value").cast(pl.Float64).alias("value"),
     )
 
-    pop = pd.read_csv(POP_CSV)
-    pop["Age"] = pop["Age"].replace("100+", "100").astype(int)
-    pop_m = pop.set_index("Age")["M"].astype(float)
-    pop_f = pop.set_index("Age")["F"].astype(float)
+    pop = pl.read_csv(POP_CSV).with_columns(
+        pl.col("Age").replace("100+", "100").cast(pl.Int64).alias("Age"),
+    )
+    pop_m = pop.select(pl.col("Age"), pl.col("M").cast(pl.Float64).alias("M"))
+    pop_f = pop.select(pl.col("Age"), pl.col("F").cast(pl.Float64).alias("F"))
 
-    common = both.index.intersection(female.index).intersection(pop_m.index)
-    rate_m = {}
-    for age in common:
-        r_b = float(both.loc[age])
-        r_f = float(female.loc[age])
-        m = float(pop_m.loc[age])
-        f = float(pop_f.loc[age])
-        if m <= 0:
-            continue
-        # Algebraic recovery of Male rate from Both and Female
-        rate_m[int(age)] = (r_b * (m + f) - f * r_f) / m
-    return pd.Series(rate_m, name="value").sort_index()
+    # Inner join on age so we only consider ages where we have rates on
+    # both sides plus population. Polars join keys are explicit.
+    joined = (
+        both.rename({"value": "r_b"})
+        .join(female.rename({"value": "r_f"}), on="AgeStart", how="inner")
+        .join(pop_m.rename({"M": "m"}), left_on="AgeStart", right_on="Age", how="inner")
+        .join(pop_f.rename({"F": "f"}), left_on="AgeStart", right_on="Age", how="inner")
+    )
+
+    rate_m = joined.filter(pl.col("m") > 0).select(
+        pl.col("AgeStart"),
+        (
+            (pl.col("r_b") * (pl.col("m") + pl.col("f")) - pl.col("f") * pl.col("r_f"))
+            / pl.col("m")
+        ).alias("value"),
+    )
+
+    return rate_m.sort("AgeStart")
 
 
-def aggregate_to_abridged(single_year: pd.Series) -> pd.DataFrame:
-    """Average single-year m(x) into 5-year abridged buckets. Use the
-    mean of single-year rates weighted by Iran male population per age
-    so the result is the rate actually experienced by the bucket."""
-    pop = pd.read_csv(POP_CSV)
-    pop["Age"] = pop["Age"].replace("100+", "100").astype(int)
-    m_pop = pop.set_index("Age")["M"].astype(float)
+def aggregate_to_abridged(single_year: pl.DataFrame) -> pl.DataFrame:
+    """Average single-year m(x) into 5-year abridged buckets, weighted
+    by Iran male population per age so the result is the rate actually
+    experienced by the bucket.
+    """
+    pop = pl.read_csv(POP_CSV).with_columns(
+        pl.col("Age").replace("100+", "100").cast(pl.Int64).alias("Age"),
+    )
+    m_pop = pop.select(pl.col("Age").alias("AgeStart"), pl.col("M").cast(pl.Float64))
+
+    # Left-join single-year rates with population weights so every age
+    # in the bucket inherits its weight (or 0 if population is missing).
+    rates = single_year.join(m_pop, on="AgeStart", how="left").with_columns(
+        pl.col("M").fill_null(0.0).alias("M"),
+    )
 
     rows: list[dict] = []
     for age_start, age_end, label in ABRIDGED_BUCKETS:
         ages = list(range(age_start, age_end)) if age_start != 100 else [100]
-        rates = single_year.reindex(ages).dropna()
-        weights = m_pop.reindex(ages).fillna(0.0)
-        valid = ~rates.isna()
-        if not valid.any() or weights[valid].sum() <= 0:
+        sub = rates.filter(pl.col("AgeStart").is_in(ages))
+        valid = sub.filter(pl.col("value").is_not_null() & pl.col("M") > 0)
+
+        if valid.height == 0:
             continue
-        agg = float((rates[valid] * weights[valid]).sum() / weights[valid].sum())
+
+        weight_sum = float(valid["M"].sum())
+        if weight_sum <= 0:
+            continue
+
+        agg = float((valid["value"] * valid["M"]).sum() / weight_sum)
         rows.append(
             {
                 "AgeStart": age_start,
                 "AgeEnd": age_end if age_start != 100 else 100,
                 "Age": label,
                 "Value": agg,
-                "pop_weight": float(weights[valid].sum()),
+                "pop_weight": weight_sum,
             }
         )
-    return pd.DataFrame(rows)
+    return pl.DataFrame(rows)
 
 
-def write_wpp_csv(abridged: pd.DataFrame) -> None:
+def write_wpp_csv(abridged: pl.DataFrame) -> None:
     """Write a WPP-shaped CSV with just abridged Male 2024 Median rows."""
     fieldnames = [
         "IndicatorId", "IndicatorName", "IndicatorShortName", "Source",
@@ -130,7 +155,7 @@ def write_wpp_csv(abridged: pd.DataFrame) -> None:
     with OUT_CSV.open("w", encoding="utf-8", newline="") as f:
         w = csv.DictWriter(f, fieldnames=fieldnames)
         w.writeheader()
-        for _, r in abridged.iterrows():
+        for r in abridged.iter_rows(named=True):
             w.writerow(
                 {
                     "IndicatorId": 79,
@@ -166,15 +191,16 @@ def write_wpp_csv(abridged: pd.DataFrame) -> None:
 
 def main() -> None:
     single_year = reconstruct_male_abridged()
-    print(f"Reconstructed Male single-year m(x) for {len(single_year)} ages")
+    print(f"Reconstructed Male single-year m(x) for {single_year.height} ages")
     print("\nSample single-year Male rates (per 1000 person-years):")
-    for age in [0, 1, 5, 30, 50, 70, 90, 100]:
-        if age in single_year.index:
-            print(f"  age {age:>3}: {single_year.loc[age] * 1000:.3f}")
+    sample_ages = {0, 1, 5, 30, 50, 70, 90, 100}
+    for r in single_year.iter_rows(named=True):
+        if r["AgeStart"] in sample_ages:
+            print(f"  age {r['AgeStart']:>3}: {r['value'] * 1000:.3f}")
 
     abridged = aggregate_to_abridged(single_year)
     print("\nAbridged 5-year Male rates (per 1000 person-years):")
-    for _, r in abridged.iterrows():
+    for r in abridged.iter_rows(named=True):
         print(f"  {r['Age']:>7}: {r['Value'] * 1000:.3f}")
 
     write_wpp_csv(abridged)

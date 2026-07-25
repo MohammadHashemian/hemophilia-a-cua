@@ -1,5 +1,5 @@
 import numpy as np
-import pandas as pd
+import polars as pl
 from scipy.stats import bootstrap, ks_2samp, pearsonr
 
 # Calibration Diagnostics
@@ -66,8 +66,11 @@ def classify_calibration(
 
 
 def build_calibration_report(
-    df: pd.DataFrame,
-) -> pd.DataFrame:
+    df: pl.DataFrame,
+) -> pl.DataFrame:
+    """Build a per-(time_horizon, sampling_method, regime) calibration
+    report from a long-form polars DataFrame of simulation results.
+    """
 
     reports = []
 
@@ -77,16 +80,19 @@ def build_calibration_report(
         "regime",
     ]
 
-    grouped = df.groupby(group_cols)
+    grouped = df.group_by(group_cols)
 
     for keys, sub in grouped:
 
-        if sub.empty:
+        if sub.is_empty():
             continue
 
+        sampled_abr = sub["sampled_abr"].to_numpy()
+        annual_bleeding_rate = sub["annual_bleeding_rate"].to_numpy()
+
         # Input expectation
-        expected_abr = float(sub["sampled_abr"].mean())
-        expected_ci_low, expected_ci_high = _bootstrap_ci(sub["sampled_abr"].values)  # type: ignore
+        expected_abr = float(sampled_abr.mean())
+        expected_ci_low, expected_ci_high = _bootstrap_ci(sampled_abr)
 
         # Realized cohort ABR
         total_bleeds = float(sub["bleeding_events"].sum())
@@ -97,9 +103,7 @@ def build_calibration_report(
             total_person_years,
         )
 
-        realized_ci_low, realized_ci_high = _bootstrap_ci(
-            sub["annual_bleeding_rate"].values  # type: ignore
-        )
+        realized_ci_low, realized_ci_high = _bootstrap_ci(annual_bleeding_rate)
 
         # Calibration statistics
 
@@ -115,8 +119,8 @@ def build_calibration_report(
 
         # Distribution similarity
         ks_stat, ks_p = ks_2samp(
-            sub["sampled_abr"],
-            sub["annual_bleeding_rate"],
+            sampled_abr,
+            annual_bleeding_rate,
         )
 
         distribution_similarity_index = 1 - float(ks_stat)  # type: ignore
@@ -125,8 +129,8 @@ def build_calibration_report(
 
         try:
             pearson_r, pearson_p = pearsonr(
-                sub["sampled_abr"],
-                sub["annual_bleeding_rate"],
+                sampled_abr,
+                annual_bleeding_rate,
             )
 
         except Exception:
@@ -140,8 +144,8 @@ def build_calibration_report(
         rmse = float(
             np.sqrt(
                 mean_squared_error(
-                    sub["sampled_abr"],
-                    sub["annual_bleeding_rate"],
+                    sampled_abr,
+                    annual_bleeding_rate,
                 )
             )
         )
@@ -164,7 +168,7 @@ def build_calibration_report(
                 "sampling_method": keys[1],
                 "regime": keys[2],
                 # Sample size
-                "n_patients": len(sub),
+                "n_patients": sub.height,
                 # Expected
                 "expected_abr": expected_abr,
                 "expected_abr_ci_low": expected_ci_low,
@@ -196,9 +200,9 @@ def build_calibration_report(
             }
         )
 
-    report_df = pd.DataFrame(reports)
+    report_df = pl.DataFrame(reports)
 
-    return report_df.sort_values(
+    return report_df.sort(
         [
             "time_horizon",
             "sampling_method",

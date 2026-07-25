@@ -4,9 +4,30 @@ from typing import Any
 
 import matplotlib.pyplot as plt
 import numpy as np
-import pandas as pd
+import polars as pl
 
 from app.visualization.plots.body_weight import plot_body_weight
+
+
+def _to_polars(df: pl.DataFrame | Any) -> pl.DataFrame:
+    """Accept a polars *or* pandas DataFrame; always return polars.
+
+    Polars-native call paths get a free pass. Pandas inputs are
+    converted with ``pl.from_pandas`` so the rest of the helper can
+    use polars expressions. The conversion is done once, at the entry
+    point of ``apply_grid``, so the plot functions downstream keep
+    their existing signatures.
+    """
+    if isinstance(df, pl.DataFrame):
+        return df
+    try:
+        return pl.from_pandas(df)
+    except (ImportError, ValueError, TypeError) as exc:
+        raise TypeError(
+            "apply_grid expects a polars.DataFrame (or a pandas "
+            "DataFrame if pandas is installed). Got "
+            f"{type(df).__name__}."
+        ) from exc
 
 
 def apply_grid(
@@ -16,11 +37,19 @@ def apply_grid(
     row_name: str,
     col_name: str,
     dataframe,
-    figsize=(14, 11),
+    figsize=(11, 8),
     gridspec_kw=None,
     title_formatter: Callable[[Any, Any], str] | None = None,
     subplot_kwargs=None,
 ):
+    """Build a grid of subplots, one per ``(row_value, col_value)`` pair.
+
+    The ``dataframe`` is sliced by ``(row_name, col_name)`` and the
+    resulting subset is passed to ``func`` as ``sub``. Accepts both
+    polars and pandas DataFrames; pandas inputs are converted
+    internally so plot functions can keep their polars-friendly
+    signatures.
+    """
     gridspec_kw = gridspec_kw or {
         "wspace": 0.05,
         "hspace": 0.25,
@@ -33,6 +62,8 @@ def apply_grid(
         def wrapper(*args, **kwargs):
             row_values_list = list(row_values)
             col_values_list = list(col_values)
+
+            df = _to_polars(dataframe)
 
             fig, axes = plt.subplots(
                 len(row_values_list),
@@ -53,10 +84,10 @@ def apply_grid(
                 for j, col_value in enumerate(col_values_list):
                     ax = axes[i][j]
 
-                    sub = dataframe[
-                        (dataframe[row_name] == row_value)
-                        & (dataframe[col_name] == col_value)
-                    ]
+                    sub = df.filter(
+                        (pl.col(row_name) == row_value)
+                        & (pl.col(col_name) == col_value)
+                    )
 
                     func(
                         ax=ax,
@@ -74,9 +105,9 @@ def apply_grid(
                     else:
                         title = f"{row_value} — {col_value}"
 
-                    ax.set_title(title)
-                    ax.grid(True, alpha=0.3)
-                    ax.set_box_aspect(1)
+                    ax.set_title(title)  # type: ignore
+                    ax.grid(True, alpha=0.3)  # type: ignore
+                    ax.set_box_aspect(1)  # type: ignore
 
             return fig, axes
 
@@ -86,26 +117,31 @@ def apply_grid(
 
 
 class OWSAPlotter:
-
     @staticmethod
     def plot_owsa_icer_tornado(
-        summary: pd.DataFrame,
+        summary: pl.DataFrame,
         filter_horizon: str | None = None,
         style: str = "dual_bars",
     ) -> None:
-        data = summary.copy()
+        """Render an OWSA tornado diagram from a polars summary frame.
+
+        The frame must contain at least the columns ``parameter``,
+        ``magnitude``, ``low_icer_change`` and ``high_icer_change``;
+        optionally ``time_horizon`` for the ``filter_horizon`` slice.
+        """
+        data = _to_polars(summary)
 
         if filter_horizon is not None:
-            data = data[data["time_horizon"] == filter_horizon]
+            data = data.filter(pl.col("time_horizon") == filter_horizon)
 
-        data = data.sort_values("magnitude", ascending=False)
+        data = data.sort("magnitude", descending=True)
 
-        labels = data["parameter"].astype(str).tolist()
+        labels = data["parameter"].cast(pl.Utf8).to_list()
 
         y = np.arange(len(labels))
 
-        low_vals = data["low_icer_change"].tolist()
-        high_vals = data["high_icer_change"].tolist()
+        low_vals = data["low_icer_change"].to_numpy()
+        high_vals = data["high_icer_change"].to_numpy()
 
         if style == "dual_bars":
 
@@ -143,11 +179,10 @@ class OWSAPlotter:
 
             fig, ax = plt.subplots(figsize=(10, max(4, len(labels) * 0.35)))
 
-            mid_points = [(lo + hi) / 2 for lo, hi in zip(low_vals, high_vals)]
+            mid_points = (low_vals + high_vals) / 2
 
-            lower_errors = [abs(m - lo) for m, lo in zip(mid_points, low_vals)]
-
-            upper_errors = [abs(h - m) for h, m in zip(high_vals, mid_points)]
+            lower_errors = np.abs(mid_points - low_vals)
+            upper_errors = np.abs(high_vals - mid_points)
 
             ax.errorbar(
                 mid_points,

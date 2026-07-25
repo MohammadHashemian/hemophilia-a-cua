@@ -1,5 +1,5 @@
 numpy
-pandas          # used only by app.notebook.excel_adapter (Excel I/O boundary)
+pandas
 scipy
 pydantic>=2
 matplotlib
@@ -18,5 +18,24 @@ pathos
 pyarrow
 fastparquet
 jinja2
-openpyxl       # Excel I/O backend (used by app.notebook.excel_adapter)
+openpyxl
 polars
+
+[data]
+openpyxl
+beautifulsoup4
+sdv
+
+[dev]
+pytest
+pytest-cov
+mypy
+ruff
+
+[ml]
+scikit-learn
+hmmlearn
+
+[notebooks]
+jupyter
+seaborn

@@ -46,6 +46,8 @@ def setup_root_logger(
     console.setLevel(level)
     console.setFormatter(formatter)
 
+    Path(log_file).parent.mkdir(parents=True, exist_ok=True)
+
     file_handler = RotatingFileHandler(
         log_file,
         mode="a",

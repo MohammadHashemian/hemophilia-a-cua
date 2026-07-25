@@ -1,3 +1,55 @@
+Metadata-Version: 2.4
+Name: markov-chains
+Version: 0.8.0
+Summary: Discrete-time Markov chain toolkit for cost-effectiveness analysis and health economic modeling
+Author-email: Mohammad Hashemian <muhammadhashemian@gmail.com>
+License: MIT
+Keywords: markov-model,health-economics,cost-effectiveness,psa,monte-carlo,qaly,icer
+Classifier: Programming Language :: Python :: 3
+Classifier: Programming Language :: Python :: 3.10
+Classifier: License :: OSI Approved :: MIT License
+Classifier: Intended Audience :: Science/Research
+Classifier: Topic :: Scientific/Engineering :: Medical Science Apps.
+Requires-Python: >=3.11
+Description-Content-Type: text/markdown
+Requires-Dist: numpy
+Requires-Dist: pandas
+Requires-Dist: scipy
+Requires-Dist: pydantic>=2
+Requires-Dist: matplotlib
+Requires-Dist: seaborn
+Requires-Dist: plotly
+Requires-Dist: numba
+Requires-Dist: xarray
+Requires-Dist: SALib
+Requires-Dist: statsmodels
+Requires-Dist: pymc
+Requires-Dist: sympy
+Requires-Dist: tqdm
+Requires-Dist: typer
+Requires-Dist: enlighten
+Requires-Dist: pathos
+Requires-Dist: pyarrow
+Requires-Dist: fastparquet
+Requires-Dist: jinja2
+Requires-Dist: openpyxl
+Requires-Dist: polars
+Provides-Extra: dev
+Requires-Dist: pytest; extra == "dev"
+Requires-Dist: pytest-cov; extra == "dev"
+Requires-Dist: mypy; extra == "dev"
+Requires-Dist: ruff; extra == "dev"
+Provides-Extra: notebooks
+Requires-Dist: jupyter; extra == "notebooks"
+Requires-Dist: seaborn; extra == "notebooks"
+Provides-Extra: data
+Requires-Dist: openpyxl; extra == "data"
+Requires-Dist: beautifulsoup4; extra == "data"
+Requires-Dist: sdv; extra == "data"
+Provides-Extra: ml
+Requires-Dist: scikit-learn; extra == "ml"
+Requires-Dist: hmmlearn; extra == "ml"
+
 <p align="center">
   <img src="logo-light.png" width="500" alt="Hemophilia Markov Model logo" />
 </p>

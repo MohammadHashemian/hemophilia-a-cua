@@ -2,7 +2,7 @@
 from collections import Counter
 
 import numpy as np
-import pandas as pd
+import polars as pl
 
 from app.domain.enums import HealthStates
 from app.domain.inputs import ModelInput
@@ -95,14 +95,19 @@ def build_df(
     results: list["SimulationResult"],
     context: ModelContext,
     options: dict | None = {},
-) -> pd.DataFrame:
+) -> pl.DataFrame:
+    """Build a polars DataFrame from a batch of simulation results.
+
+    Each row corresponds to a single ``SimulationResult`` and contains
+    the model inputs, summary outputs, and state-occupation aggregates
+    listed in ``columns`` + ``occupation_columns``.
+    """
     logger = setup_root_logger()
 
-    # Unpack
     cost_unit = context.costs.currencies[0].code
     per_unit_cost = context.costs.costs[0].pricing.per_unit[cost_unit]
 
-    data = []
+    data: list[dict] = []
 
     for result in results:
         inputs = require(result.input_data, ModelInput)
@@ -219,4 +224,22 @@ def build_df(
 
         data.append(row)
 
-    return pd.DataFrame(data)
+    df = pl.DataFrame(data, infer_schema_length=10000)
+
+    # Polars infers nullable columns as ``Null`` when a batch happens to
+    # have only nulls in that column (e.g. ``extension`` is None for
+    # every "base" scenario in a batch). When a later batch carries
+    # any string value, the same column is inferred as ``String`` and
+    # ``pl.concat(..., how="vertical")`` refuses to vstack the two
+    # frames. Force a stable schema by casting each known nullable
+    # column to its non-null dtype; nulls are valid String / Float64
+    # values.
+    nullable_casts: dict[str, pl.DataType] = {
+        "extension": pl.String,
+        "absorbed_at": pl.Float64,
+    }
+    for col, dtype in nullable_casts.items():
+        if col in df.columns and df.schema[col] != dtype:
+            df = df.with_columns(pl.col(col).cast(dtype))
+
+    return df
