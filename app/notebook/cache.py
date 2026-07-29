@@ -1,7 +1,7 @@
 """Resolve the on-disk location of cached simulation results.
 
-The PSA / OWSA simulation notebooks (``03_psa_simulation.ipynb`` and
-``04_owsa_simulation.ipynb``) write their combined output to
+The legacy combined PSA notebook and the OWSA simulation notebook write their
+combined output to
 ``app/cache/{psa,owsa}/parquet/all_results_combined.parquet``. The
 analysis notebooks (05 / 07) then load from there.
 
@@ -28,7 +28,8 @@ __all__ = ["resolve_cache", "CACHE_RESOLVERS"]
 def _fallback_message(name: str) -> str:
     return (
         f"No cached {name} results found. Either:\n"
-        f"  - run `app/notebooks/{ ('03_psa_simulation' if name == 'psa' else '04_owsa_simulation') }.ipynb` to produce\n"
+        f"  - run the appropriate horizon-specific PSA `02_simulation.ipynb`"
+        f" or `app/notebooks/04_owsa_simulation.ipynb` to produce\n"
         f"    app/cache/{name}/parquet/all_results_combined.parquet, OR\n"
         f"  - drop a previous run's combined parquet at that path, OR\n"
         f"  - leave app/cache/{ ('simulation' if name == 'psa' else 'owsa') }_output.parquet\n"

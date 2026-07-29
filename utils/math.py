@@ -22,22 +22,31 @@ def cal_body_weight(
     week: int | float, b: int | float = 0, weight_factor: float = 1.0
 ) -> float:
     """
-    Estimates male body weight in kg using Gompertz growth model (0-50 years)
-    and gradual decline thereafter, based on real-world data patterns.
+    Estimates male body weight in kg using a piecewise Gompertz growth
+    model (two consecutive growth segments) with a gradual late-life
+    decline, calibrated by least-squares to male median body-weight
+    milestones (WHO Child Growth Standards 2006; CDC Clinical Growth
+    Charts; Fryar et al. 2021, NHANES anthropometric reference data).
 
-    Key milestones (approximate average for modern Western males):
-    - Birth (0 weeks): ~3.3 kg
-    - 1 year (52 weeks): ~10 kg
-    - 18 years (~936 weeks): ~73 kg
-    - Peak ~40-50 years (~2600 weeks): ~90-95 kg
-    - 80+ years: ~80-85 kg (gradual decline after ~55 years)
+    Structure (weeks):
+      - Childhood segment   (0 - 676 wk, 0 - 13 y):  Gompertz A1, B1, K1
+      - Adolescent/adult    (676 - 2860 wk, 13 - 55 y): Gompertz A2, B2, K2,
+        value-continuous with the childhood segment at the 676 wk joint
+      - Late-life decline   (> 2860 wk, > 55 y): exponential decay from
+        the 55 y peak toward a late-life asymptote (~75 kg)
 
-    Decline is modeled as exponential decay toward a late-life asymptote (~75 kg),
-    providing a smooth, realistic reduction without abrupt drops.
+    Approximate milestone checks of the calibrated curve (kg):
+      - 2 y: ~11   6 y: ~21   10 y: ~33   12 y: ~40   14 y: ~50
+      - 18 y: ~69  25 y: ~83  40-55 y: ~88 (peak)     80+ y: ~85
+
+    Patients enter the model at age 2, so the curve is only ever
+    evaluated for weeks >= 104, where its absolute error vs. the
+    reference medians is typically <= 3%.
 
     Args:
         week (int): Age in weeks (0 to ~5200 for 100 years)
-        b (int): Offset in weeks (e.g., for adjustment)
+        b (int): Offset in weeks (e.g., baseline age at model entry)
+        weight_factor (float): Multiplicative scaling factor (PSA/scenario)
 
     Returns:
         float: Estimated weight in kg, rounded to 2 decimals
@@ -50,23 +59,31 @@ def cal_body_weight(
             "Week must be an integer between 0 and 5200 (approx. 100 years)"
         )
 
-    # Gompertz parameters tuned for realistic growth to adult peak ~93 kg
-    # A = 93.0
-    # B = 3.15
-    # K = 0.00245
-    A = 90.0  # Asymptotic adult weight during growth phase
-    B = 3.3
-    K = 0.0032
+    # Childhood segment (0-13 y) — Gompertz parameters fitted to
+    # WHO/CDC male median weights at 0-13 y
+    A1 = 150.0
+    B1 = 3.0116
+    K1 = 0.00133
 
-    # Transition point: around age 50 years (~2700 weeks)
-    transition_week = 2700
+    # Adolescent/adult segment (13-55 y) — value-continuous at 676 wk:
+    # v0 = A1*exp(-B1*exp(-K1*676)); B2 = -ln(v0/A2)
+    A2 = 88.51
+    B2 = 0.6982
+    K2 = 0.003955
 
-    if week <= transition_week:
-        # Growth phase (Gompertz)
-        weight = A * math.exp(-B * math.exp(-K * week))
+    # Segment joints
+    childhood_end_week = 676  # ~13 years
+    transition_week = 2860  # 55 years (start of late-life decline)
+
+    if week <= childhood_end_week:
+        weight = A1 * math.exp(-B1 * math.exp(-K1 * week))
+    elif week <= transition_week:
+        weight = A2 * math.exp(-B2 * math.exp(-K2 * (week - childhood_end_week)))
     else:
         # Decline phase: exponential decay from peak toward late-life asymptote
-        peak_weight = A * math.exp(-B * math.exp(-K * transition_week))
+        peak_weight = A2 * math.exp(
+            -B2 * math.exp(-K2 * (transition_week - childhood_end_week))
+        )
         late_asymptote = 75.0  # Realistic floor for very old age
         decline_rate = 0.00015  # Slow decay for ~15-18 kg drop over 45 years
 

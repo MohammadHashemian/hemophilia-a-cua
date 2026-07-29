@@ -80,17 +80,17 @@ class TestMakePetterssonScore:
 class TestPetterssonToSeverity:
     def test_healthy(self):
         assert pettersson_to_severity(0) == ArthropathySeverity.HEALTHY
+        assert pettersson_to_severity(3) == ArthropathySeverity.HEALTHY
 
     def test_mild(self):
-        assert pettersson_to_severity(1) == ArthropathySeverity.MILD
         assert pettersson_to_severity(4) == ArthropathySeverity.MILD
+        assert pettersson_to_severity(26) == ArthropathySeverity.MILD
 
     def test_moderate(self):
-        assert pettersson_to_severity(5) == ArthropathySeverity.MODERATE
         assert pettersson_to_severity(27) == ArthropathySeverity.MODERATE
+        assert pettersson_to_severity(78) == ArthropathySeverity.MODERATE
 
     def test_severe(self):
-        assert pettersson_to_severity(28) == ArthropathySeverity.SEVERE
         assert pettersson_to_severity(79) == ArthropathySeverity.SEVERE
 
 
@@ -133,7 +133,8 @@ class TestWeight:
         inputs_high = type("obj", (object,), {"weight_factor": 2.0})()
         w1 = weight(step=1000, state="healthy", const={"baseline_age_weeks": 0}, inputs=inputs_low)
         w2 = weight(step=1000, state="healthy", const={"baseline_age_weeks": 0}, inputs=inputs_high)
-        assert abs(w2 - 2 * w1) < 0.01
+        # cal_body_weight rounds to 2 decimals, so allow one rounding unit
+        assert abs(w2 - 2 * w1) <= 0.02
 
 
 class TestConsumption:

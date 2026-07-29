@@ -17,15 +17,15 @@ from typing import Any
 
 import numpy as np
 
-from utils.math import to_weekly
-
 
 def _precompute_age_mortality(mortality_file: Any) -> np.ndarray:
-    """Precompute per-age annual mortality rate (length ~120).
+    """Precompute per-age *weekly* death probability (length ~120).
 
-    The original AgeBasedMortalityModifier does a per-step dict lookup;
-    for the batch path we materialize the lookup as a numpy array so the
-    modifier can be a single vectorized expression.
+    The life table stores annual probabilities of death (q_x). Conversion
+    to the weekly cycle uses the constant-hazard identity
+    ``p_week = 1 - (1 - q_x) ** (1/52)`` (equivalently 1 - exp(-h/52) with
+    h = -ln(1 - q_x)). The result is indexed by integer age so the per-step
+    mortality adjustment is a single array lookup.
     """
     max_age = 120
     rates = np.full(max_age, float(mortality_file.crude_annual_rate), dtype=np.float64)
@@ -47,7 +47,9 @@ def _precompute_age_mortality(mortality_file: Any) -> np.ndarray:
                     rates[idx] = rate
             except ValueError:
                 continue
-    return rates
+    rates = np.clip(rates, 0.0, 0.999999)
+    # annual probability -> weekly probability (actuarially consistent)
+    return 1.0 - (1.0 - rates) ** (1.0 / 52.0)
 
 
 @dataclass
@@ -79,9 +81,12 @@ class BatchMarkovChain:
         Per-iter absorbing-state mask.
     death_idx, lt_bleeding_idx : int
         Indices used to skip mortality adjustment.
-    mortality_rates_per_age : (max_age,) array, optional
-        Precomputed annual mortality rates by age. If None, no mortality
-        adjustment is applied.
+    mortality_weekly_prob_per_age : (max_age,) array, optional
+        Precomputed weekly death probabilities by age. If None, no
+        mortality adjustment is applied.
+    baseline_age : int
+        Patient age at simulation start; the age band used for the
+        mortality lookup only changes at calendar-year boundaries.
     """
 
     def __init__(
@@ -90,7 +95,8 @@ class BatchMarkovChain:
         absorbing_mask: np.ndarray,
         death_idx: int,
         lt_bleeding_idx: int,
-        mortality_rates_per_age: np.ndarray | None = None,
+        mortality_weekly_prob_per_age: np.ndarray | None = None,
+        baseline_age: int = 0,
     ) -> None:
         if matrices.ndim != 3:
             raise ValueError("matrices must be (n_iters, n_states, n_states)")
@@ -103,7 +109,8 @@ class BatchMarkovChain:
         self.absorbing_mask = absorbing_mask
         self.death_idx = death_idx
         self.lt_bleeding_idx = lt_bleeding_idx
-        self.mortality_rates_per_age = mortality_rates_per_age
+        self.mortality_weekly_prob_per_age = mortality_weekly_prob_per_age
+        self.baseline_age = int(baseline_age)
 
     @classmethod
     def from_chain(
@@ -113,6 +120,7 @@ class BatchMarkovChain:
         absorbing_states: set[str] | None,
         mortality_file: Any | None = None,
         auto_detect_absorbing: bool = False,
+        baseline_age: float = 0,
     ) -> BatchMarkovChain:
         """Build a BatchMarkovChain from per-iter matrices and state names.
 
@@ -154,26 +162,32 @@ class BatchMarkovChain:
             absorbing_mask=mask,
             death_idx=death_idx,
             lt_bleeding_idx=lt_bleeding_idx,
-            mortality_rates_per_age=mort,
+            mortality_weekly_prob_per_age=mort,
+            baseline_age=baseline_age,
         )
 
-    def _apply_mortality(self, probs: np.ndarray, step: int) -> np.ndarray:
+    def _apply_mortality(
+        self, probs: np.ndarray, step: int, current_state_idx: np.ndarray
+    ) -> np.ndarray:
         """Apply age-based mortality adjustment to (n_iters, n_states) probs.
 
-        Skipped on non-year-boundary steps. The original scalar modifier
-        also short-circuits when current state is 'death' or 'lt_bleeding'
-        — here we apply adjustment to all iters and let the absorbing mask
-        mask out the irrelevant ones at the next step.
+        Applied every week with the weekly death probability of the
+        patient's current age band (the band itself only changes at
+        calendar-year boundaries). Iters currently in the absorbing or
+        life-threatening-bleeding states are left untouched, mirroring
+        the scalar ``AgeBasedMortalityModifier``.
         """
-        if self.mortality_rates_per_age is None or step % 52 != 0:
+        if self.mortality_weekly_prob_per_age is None:
             return probs
 
-        age = max(0, step // 52)
-        if age >= len(self.mortality_rates_per_age):
-            annual_rate = self.mortality_rates_per_age[-1]
+        age = max(0, self.baseline_age + step // 52)
+        if age >= len(self.mortality_weekly_prob_per_age):
+            weekly_death_prob = self.mortality_weekly_prob_per_age[-1]
         else:
-            annual_rate = self.mortality_rates_per_age[age]
-        weekly_death_prob = 1.0 - np.exp(-to_weekly(annual_rate))
+            weekly_death_prob = self.mortality_weekly_prob_per_age[age]
+
+        if weekly_death_prob <= 0.0:
+            return probs
 
         base_death = probs[:, self.death_idx]
         # If base death is already 1, skip
@@ -194,6 +208,13 @@ class BatchMarkovChain:
         new_probs = np.divide(
             new_probs, row_sums, out=np.zeros_like(new_probs), where=row_sums > 0
         )
+
+        # Iters in lt_bleeding keep their special (case-fatality) row,
+        # matching the scalar modifier which skips that state.
+        if self.lt_bleeding_idx >= 0:
+            in_lt = current_state_idx == self.lt_bleeding_idx
+            if in_lt.any():
+                new_probs[in_lt] = probs[in_lt]
         return new_probs
 
     def walk_batch(
@@ -247,10 +268,6 @@ class BatchMarkovChain:
         current_state_idx = np.full(self.n_iters, entrance_idx, dtype=np.int32)
         active = np.ones(self.n_iters, dtype=bool)
         store_arrays: dict[str, np.ndarray] = {}
-
-        # Pre-compute cumsum of matrices once: (n_iters, n_states, n_states)
-        # We use this for fast per-step sampling.
-        matrices_cumsum = np.cumsum(self.matrices, axis=2)
 
         for step in range(steps + 1):
             sequences[:, step] = current_state_idx
@@ -308,11 +325,9 @@ class BatchMarkovChain:
             probs = self.matrices[np.arange(self.n_iters), current_state_idx].copy()
 
             # Apply mortality modifier (vectorized)
-            probs = self._apply_mortality(probs, step)
+            probs = self._apply_mortality(probs, step, current_state_idx)
 
             # Vectorized categorical sampling via cumsum + uniform
-            cumsum = matrices_cumsum[np.arange(self.n_iters), current_state_idx]
-            # Override with mortality-adjusted cumsum (compute once)
             cumsum = np.cumsum(probs, axis=1)
             u = rng.random(self.n_iters)
             # argmax of (u[:, None] < cumsum) along axis 1

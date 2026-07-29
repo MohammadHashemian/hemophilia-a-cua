@@ -885,6 +885,7 @@ class TestDomainTransitionMatrixBuilder:
             spontaneous_bleeding_rate=10.0,
             joint_bleeding_rate=4.0,
             life_threatening_bleeding_rate=1.0,
+            ltb_case_fatality=0.35,
             baseline_age=2.0,
             weight_factor=1.0,
             benefits_discount_rate=0.0,

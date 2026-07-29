@@ -57,7 +57,7 @@ class ModelOutput:
     qalys: list[float]
     mean_weight: float
     pettersson_score: int
-    absorbed_at: int
+    absorbed_at: int | None
     sequence: list[str]
     event_count: list[int]
 
@@ -174,7 +174,9 @@ def worker_function(
         conditions=None,
         entrance_chain="main",
         steps=int(inputs.cycle),
-        transition_modifier=AgeBasedMortalityModifier(mortality_file=context.mortality),
+        transition_modifier=AgeBasedMortalityModifier(
+            mortality_file=context.mortality, baseline_age=inputs.baseline_age
+        ),
         worker_kwargs={},
         absorbing_states={"death"},
     )
@@ -290,7 +292,12 @@ def _aggregate_vectorized_output(
 ) -> ModelOutput:
     """Build a single ModelOutput from the (n_iters, ...) batch arrays at index idx."""
     sequences = batch.sequences[idx]
-    absorbed_at = int(batch.absorbed_at[idx])
+    # ``walk_batch`` records ``steps + 1`` for iters that never reach an
+    # absorbing state; map that sentinel to ``None`` so downstream
+    # ``is_absorbed`` semantics match the scalar engine exactly.
+    steps = sequences.shape[0] - 1
+    raw_absorbed = int(batch.absorbed_at[idx])
+    absorbed_at = None if raw_absorbed > steps else raw_absorbed
     rewards = batch.rewards
 
     factor_seq = rewards["consumption"][idx]
@@ -353,6 +360,7 @@ def worker_function_batch(
         states=states,
         absorbing_states={"death"},
         mortality_file=context.mortality,
+        baseline_age=inputs[0].baseline_age,
     )
 
     # 3. Build per-iter constants

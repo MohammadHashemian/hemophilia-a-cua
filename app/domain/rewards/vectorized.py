@@ -51,23 +51,27 @@ def register_state_index(name: str, idx: int) -> None:
 def store_weight(step, state_idx, store_arrays, shared_kwargs, rng):
     """Per-iter body weight (kg) at the current step.
 
-    Same for all iters at a given step; varies across iters only via
-    weight_factor (and step is constant).
+    Weight is state-independent at a given step but varies across iters
+    through the per-iter ``weight_factor`` (PSA / scenario variation),
+    matching the scalar ``weight`` store function iter-for-iter.
     """
     per_iter = shared_kwargs["per_iter"]
     weight_factor = per_iter["weight_factor"]
     baseline_age_weeks = shared_kwargs["baseline_age_weeks"]
-    week = step + baseline_age_weeks
-    return np.full(
-        state_idx.shape, cal_body_weight(int(week), 0, float(weight_factor[0]))
+    week = int(step + baseline_age_weeks)
+    return np.array(
+        [cal_body_weight(week, 0, float(wf)) for wf in weight_factor],
+        dtype=np.float64,
     )
 
 
 def store_event_count(step, state_idx, store_arrays, shared_kwargs, rng):
     """Zero-truncated Poisson sample of bleeding/hemarthrosis event count.
 
-    For iters in absorbing or non-bleeding states, returns 0.
-    Uses a single RNG draw per iter; lam varies per-iter.
+    For iters in absorbing or non-bleeding states, returns 0. Iters in the
+    life-threatening-bleeding state count exactly one episode (matching
+    the scalar ``event_count``); bleeding/hemarthrosis iters draw from a
+    zero-truncated Poisson with the per-iter weekly rate.
     """
     per_iter = shared_kwargs["per_iter"]
     lam_bleed = per_iter["lam_bleed"]
@@ -83,7 +87,11 @@ def store_event_count(step, state_idx, store_arrays, shared_kwargs, rng):
     in_bleeding = state_idx == bleeding_idx
     in_hemarthrosis = state_idx == hemarthrosis_idx
     in_lt = state_idx == lt_bleeding_idx
-    in_any = in_bleeding | in_hemarthrosis | in_lt
+
+    # Exactly one LTB episode per LTB-state week (scalar parity)
+    out[in_lt] = 1.0
+
+    in_any = in_bleeding | in_hemarthrosis
 
     if not in_any.any():
         return out
@@ -92,7 +100,6 @@ def store_event_count(step, state_idx, store_arrays, shared_kwargs, rng):
     lam = np.zeros(n_iters, dtype=np.float64)
     lam[in_bleeding] = lam_bleed[in_bleeding]
     lam[in_hemarthrosis] = lam_joint[in_hemarthrosis]
-    lam[in_lt] = np.maximum(lam_bleed[in_lt], lam_joint[in_lt])  # placeholder
 
     # k_max from Poisson(lam) ppf(0.9999) — cap at 50 for safety
     # Compute k_max vectorized

@@ -18,6 +18,10 @@ class EventRates(BaseModel):
 class Epidemiology(BaseModel):
     event_fractions: EventFractions
     event_rates: EventRates
+    # Conditional probability of death per life-threatening bleeding
+    # episode. Base value 0.35 follows the Zwagemaker et al. (2021)
+    # meta-analysis (ICH mortality 0.8 vs incidence 2.3 per 1000 PY).
+    ltb_case_fatality: float = 0.35
 
 
 class UtilityDecrements(BaseModel):

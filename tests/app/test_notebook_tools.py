@@ -3,7 +3,11 @@ import pytest
 
 from app.notebook.calibration import _safe_div, classify_calibration
 from app.notebook.dataframe_builders import calculate_state_occupation
-from app.notebook.scenario_helpers import pair_scenarios, parse_scenario
+from app.notebook.scenario_helpers import (
+    ltb_mode_for_scenario,
+    pair_scenarios,
+    parse_scenario,
+)
 from app.notebook.smoke import main as smoke_main
 
 
@@ -104,7 +108,7 @@ class TestPairScenarios:
 
     def test_no_matching_pair_raises(self):
         scenarios = ["lifetime on_demand bayesian", "early prophylaxis bayesian"]
-        with pytest.raises(ValueError, match="Missing prophylaxis scenario"):
+        with pytest.raises(ValueError, match="Missing on-demand scenario"):
             pair_scenarios(scenarios)
 
     def test_multiple_pairs(self):
@@ -124,6 +128,51 @@ class TestPairScenarios:
         ]
         pairs = pair_scenarios(scenarios)
         assert len(pairs) == 1
+
+    def test_base_and_extended_pairs_can_be_sorted_together(self):
+        scenarios = [
+            "lifetime prophylaxis bayesian high_cost",
+            "lifetime on_demand bayesian",
+            "lifetime on_demand bayesian high_cost",
+            "lifetime prophylaxis bayesian",
+        ]
+        assert pair_scenarios(scenarios) == [
+            ("lifetime on_demand bayesian", "lifetime prophylaxis bayesian"),
+            (
+                "lifetime on_demand bayesian high_cost",
+                "lifetime prophylaxis bayesian high_cost",
+            ),
+        ]
+
+    def test_pairs_are_sorted_deterministically(self):
+        scenarios = [
+            "lifetime prophylaxis dirichlet",
+            "early on_demand bayesian",
+            "lifetime on_demand bayesian",
+            "early prophylaxis bayesian",
+            "lifetime on_demand dirichlet",
+            "lifetime prophylaxis bayesian",
+            "early prophylaxis dirichlet",
+            "early on_demand dirichlet",
+        ]
+        pairs = pair_scenarios(scenarios)
+        assert pairs == [
+            ("early on_demand bayesian", "early prophylaxis bayesian"),
+            ("early on_demand dirichlet", "early prophylaxis dirichlet"),
+            ("lifetime on_demand bayesian", "lifetime prophylaxis bayesian"),
+            ("lifetime on_demand dirichlet", "lifetime prophylaxis dirichlet"),
+        ]
+
+
+class TestLTBModeForScenario:
+    def test_fraction_is_the_default_base_case(self):
+        assert ltb_mode_for_scenario("early on_demand bayesian") == "fraction"
+
+    def test_absolute_incidence_requires_explicit_scenario_token(self):
+        assert (
+            ltb_mode_for_scenario("lifetime prophylaxis bayesian ltb_absolute")
+            == "absolute"
+        )
 
 
 class TestSeedSmokeScript:

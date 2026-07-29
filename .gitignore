@@ -1,5 +1,6 @@
 data/raw/private-*
 app/data/raw/private-*
+shared/*
 /__pycache__
 */__pycache__
 .pytest_cache

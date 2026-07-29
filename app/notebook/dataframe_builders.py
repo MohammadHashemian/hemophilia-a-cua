@@ -1,5 +1,5 @@
 
-from collections import Counter
+from collections import Counter, defaultdict
 
 import numpy as np
 import polars as pl
@@ -14,6 +14,7 @@ from utils.logging import setup_root_logger
 
 columns = [
     "scenario",
+    "iteration_id",
     "time_horizon",
     "regime",
     "extension",
@@ -104,17 +105,29 @@ def build_df(
     """
     logger = setup_root_logger()
 
+    # Fallback unit price when an input does not carry one (legacy runs).
     cost_unit = context.costs.currencies[0].code
-    per_unit_cost = context.costs.costs[0].pricing.per_unit[cost_unit]
+    default_per_unit_cost = context.costs.costs[0].pricing.per_unit[cost_unit]
 
     data: list[dict] = []
+    scenario_iteration: defaultdict[str, int] = defaultdict(int)
 
     for result in results:
+        # Preserve the input draw's position within its scenario even if a
+        # later validation causes that result to be omitted from the frame.
+        # This makes cross-regime joins explicit and prevents shifted pairing.
+        iteration_id = scenario_iteration[result.scenario]
+        scenario_iteration[result.scenario] += 1
+
         inputs = require(result.input_data, ModelInput)
         output = require(result.output, ModelOutput)
 
         if output is None:
             continue
+
+        # The PSA-sampled unit price is the authoritative price for this
+        # iteration; the static context price is only a fallback.
+        per_unit_cost = inputs.per_unit_price or default_per_unit_cost
 
         cycles = int(output.cycles)
         end = int(output.absorbed_at) if output.absorbed_at is not None else cycles
@@ -190,6 +203,7 @@ def build_df(
 
         row = {
             "scenario": result.scenario,
+            "iteration_id": iteration_id,
             "time_horizon": time_horizon,
             "regime": regime,
             "extension": extension,

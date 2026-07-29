@@ -12,6 +12,7 @@ class ModelInput:
     spontaneous_bleeding_rate: float  # computed property
     joint_bleeding_rate: float
     life_threatening_bleeding_rate: float
+    ltb_case_fatality: float  # conditional death prob. per LTB episode
 
     # Demographics
     baseline_age: float

@@ -44,6 +44,11 @@ def parse_scenario(scenario: str) -> tuple[str, str, str, str | None]:
     return time_horizon, regime, sampling_method, extension
 
 
+def _scenario_sort_key(scenario: str) -> tuple[str, str, str, str]:
+    time_horizon, regime, sampling_method, extension = parse_scenario(scenario)
+    return time_horizon, sampling_method, extension or "", regime
+
+
 def pair_scenarios(scenarios: list[str]) -> list[tuple[str, str]]:
     """
     Pair:
@@ -57,7 +62,7 @@ def pair_scenarios(scenarios: list[str]) -> list[tuple[str, str]]:
 
     grouped = {}
 
-    for scenario in scenarios:
+    for scenario in sorted(scenarios, key=_scenario_sort_key):
         (
             time_horizon,
             regime,
@@ -80,7 +85,11 @@ def pair_scenarios(scenarios: list[str]) -> list[tuple[str, str]]:
 
     paired_scenarios = []
 
-    for key, regimes in grouped.items():
+    # Base scenarios use ``None`` for extension while extended scenarios use
+    # strings. Python cannot directly order None and str, so normalize the
+    # extension solely for sorting while retaining the original grouping key.
+    for key in sorted(grouped, key=lambda item: (item[0], item[1], item[2] or "")):
+        regimes = grouped[key]
         if "on-demand" not in regimes:
             raise ValueError(f"Missing on-demand scenario for group: {key}")
 
@@ -185,3 +194,13 @@ def get_parameter_label(extension: str | None) -> str:
 def get_base_pair_key(scenario: str) -> tuple[str, str]:
     time_horizon, regime, sampling_method, _ = parse_scenario(scenario)
     return time_horizon, sampling_method
+
+
+def ltb_mode_for_scenario(scenario: str) -> str:
+    """Resolve the LTB specification mode for a scenario name.
+
+    The thesis base case models life-threatening bleeding as a sampled
+    fraction of ABR. Scenarios whose extension contains the explicit token
+    ``ltb_absolute`` instead use evidence-based absolute annual incidence.
+    """
+    return "absolute" if "ltb_absolute" in scenario else "fraction"

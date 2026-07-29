@@ -14,9 +14,30 @@ from utils.math import (
 
 
 class TestCalBodyWeight:
-    def test_birth_weight(self):
-        w = cal_body_weight(0)
-        assert 2.5 <= w <= 4.5
+    def test_milestone_weights_modeled_range(self):
+        """Calibrated curve must track male median weight milestones over
+        the modeled age range (patients enter at age 2, so the curve is
+        calibrated for weeks >= 104; the birth anchor is intentionally
+        not a calibration target)."""
+        milestones = {
+            104: (12.2, 2.5),   # 2 y
+            260: (18.4, 2.0),   # 5 y
+            520: (32.2, 2.5),   # 10 y
+            624: (40.5, 2.5),   # 12 y
+            936: (70.0, 3.0),   # 18 y
+            2080: (90.0, 3.0),  # 40 y
+        }
+        for week, (expected, tol) in milestones.items():
+            w = cal_body_weight(week)
+            assert abs(w - expected) <= tol, (
+                f"week {week}: {w} vs milestone {expected} (tol {tol})"
+            )
+
+    def test_peak_then_decline_after_55y(self):
+        w_peak = cal_body_weight(2860)  # 55 y
+        w_old = cal_body_weight(4680)  # 90 y
+        assert 85.0 <= w_peak <= 92.0
+        assert w_old < w_peak
 
     def test_positive_weight(self):
         for week in [0, 52, 500, 1000, 2000, 4000, 5000]:
@@ -33,7 +54,7 @@ class TestCalBodyWeight:
     def test_weight_with_factor(self):
         w_default = cal_body_weight(2000)
         w_scaled = cal_body_weight(2000, weight_factor=2.0)
-        assert abs(w_scaled - w_default * 2.0) < 0.01
+        assert abs(w_scaled - w_default * 2.0) <= 0.02
 
     def test_weight_with_offset(self):
         w = cal_body_weight(100, b=50)

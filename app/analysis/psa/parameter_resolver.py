@@ -1,38 +1,68 @@
-
 import numpy as np
 
 from app.domain.inputs import ModelInput
 
+#: LTB specification modes.
+#:
+#: - ``"fraction"``: LTB incidence scales with ABR via
+#:   ``life_threatening_bleeding_fraction``; ABR is split three ways
+#:   (spontaneous / joint / LTB). This is the thesis base case.
+#: - ``"absolute"``: LTB incidence is an absolute annual rate sampled from
+#:   published evidence (Zwagemaker et al. 2021; Toure et al. 2022), i.e.
+#:   ``life_threatening_bleeding_rate`` is used directly and ABR is split
+#:   only between spontaneous and joint bleeding. This is a structural
+#:   sensitivity scenario.
+LTB_MODES = ("absolute", "fraction")
+
 
 class ParameterResolver:
     @staticmethod
-    def resolve_samples(samples: dict[str, np.ndarray]) -> dict[str, np.ndarray]:
+    def resolve_samples(
+        samples: dict[str, np.ndarray], ltb_mode: str = "fraction"
+    ) -> dict[str, np.ndarray]:
         """
         Vectorized deterministic transformation layer
         Handles all dependencies safely.
         """
 
+        if ltb_mode not in LTB_MODES:
+            raise ValueError(
+                f"Unknown ltb_mode '{ltb_mode}', expected one of {LTB_MODES}"
+            )
+
         bleeding = samples["bleeding_rate"]
 
         joint_frac = samples["joint_bleeding_fraction"]
-        lt_frac = samples["life_threatening_bleeding_fraction"]
 
-        # ---- Safety: enforce valid simplex ----
-        # Prevent pathological PSA draws (rare but critical)
-        total_frac = joint_frac + lt_frac
-        overflow_mask = total_frac > 1.0
+        # ---- Safety: keep fractions in [0, 1] ----
+        joint_frac = np.clip(joint_frac, 0.0, 1.0)
 
-        if np.any(overflow_mask):
-            # Normalize proportions if they exceed 1
-            joint_frac = np.where(overflow_mask, joint_frac / total_frac, joint_frac)
-            lt_frac = np.where(overflow_mask, lt_frac / total_frac, lt_frac)
+        if ltb_mode == "fraction":
+            lt_frac = samples["life_threatening_bleeding_fraction"]
 
-        spontaneous_frac = 1.0 - joint_frac - lt_frac
+            # ---- Safety: enforce valid simplex ----
+            # Prevent pathological PSA draws (rare but critical)
+            total_frac = joint_frac + lt_frac
+            overflow_mask = total_frac > 1.0
+
+            if np.any(overflow_mask):
+                # Normalize proportions if they exceed 1
+                joint_frac = np.where(
+                    overflow_mask, joint_frac / total_frac, joint_frac
+                )
+                lt_frac = np.where(overflow_mask, lt_frac / total_frac, lt_frac)
+
+            spontaneous_frac = 1.0 - joint_frac - lt_frac
+            lt_rate = bleeding * lt_frac
+        else:
+            # absolute mode: LTB incidence is an absolute annual rate,
+            # independent of the sampled ABR.
+            spontaneous_frac = 1.0 - joint_frac
+            lt_rate = samples["life_threatening_bleeding_rate"]
 
         # ---- Derived rates ----
         spontaneous_rate = bleeding * spontaneous_frac
         joint_rate = bleeding * joint_frac
-        lt_rate = bleeding * lt_frac
 
         return {
             **samples,
@@ -55,6 +85,7 @@ class ParameterResolver:
             spontaneous_bleeding_rate=res["spontaneous_bleeding_rate"][i],
             joint_bleeding_rate=res["joint_bleeding_rate"][i],
             life_threatening_bleeding_rate=res["life_threatening_bleeding_rate"][i],
+            ltb_case_fatality=res["ltb_case_fatality"][i],
             # Demographics
             baseline_age=res["baseline_age"][i],
             weight_factor=res["weight_factor"][i],

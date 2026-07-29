@@ -1,9 +1,9 @@
 {
   "state_utilities": {
     "healthy": 0.915,
-    "mild_arthropathy": 0.875,
-    "moderate_arthropathy": 0.731,
-    "severe_arthropathy": 0.54,
+    "mild_arthropathy": 0.85,
+    "moderate_arthropathy": 0.78,
+    "severe_arthropathy": 0.68,
     "bleeding": 0.6,
     "hemarthrosis": 0.5,
     "lt_bleeding": 0.25,

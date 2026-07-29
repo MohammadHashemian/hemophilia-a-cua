@@ -2,23 +2,22 @@
   "epidemiology": {
     "event_fractions": {
       "ajbr_fraction": 0.75,
-      "ltb_fraction": 0.045
+      "ltb_fraction": 0.025
     },
     "event_rates": {
       "ltb_rate": {
-        "on_demand": 0.00255,
-        "prophylaxis": 0.00166
+        "on_demand": 0.0074,
+        "prophylaxis": 0.0074
       }
-    }
+    },
+    "ltb_case_fatality": 0.35
   },
-
   "utilities": {
     "decrements": {
       "on_demand": 0.0003725,
       "prophylaxis": 0.0018
     }
   },
-
   "clinical_scoring": {
     "pettersson_score": {
       "conversion_factor": 12.6,
@@ -29,7 +28,6 @@
       }
     }
   },
-
   "treatment": {
     "dosing": {
       "ir_prophylaxis_weekly_dose_ui": 50,
@@ -39,10 +37,17 @@
       "lt_bleeding_dose_ui": 550
     }
   },
-
   "evidence": {
     "abr": {
       "on_demand": [
+        {
+          "mean": 30.5,
+          "sd": 19.5,
+          "source": "M. J. Manco-Johnson et al.",
+          "size": "42",
+          "doi": "10.1111/jth.12202",
+          "description": "SPINART study"
+        },
         {
           "mean": 58.3,
           "sd": 26.9,
@@ -176,7 +181,7 @@
           "source": "K. Kavakli",
           "size": "21",
           "doi": "10.1111/jth.12828",
-          "description": "risk of bias"
+          "description": "LEOPOLD II Study"
         },
         {
           "mean": 37.9,
@@ -244,8 +249,15 @@
           "description": "pre-study on-demand treatment"
         }
       ],
-
       "prophylaxis": [
+        {
+          "mean": 2.0,
+          "sd": 4.5,
+          "source": "M. J. Manco-Johnson et al.",
+          "size": "42",
+          "doi": "10.1111/jth.12202",
+          "description": "SPINART study"
+        },
         {
           "mean": 2.5,
           "sd": 4.6,
@@ -388,7 +400,7 @@
           "source": "K. Kavakli",
           "size": "31",
           "doi": "10.1111/jth.12828",
-          "description": "3x weekly prophylaxis included"
+          "description": "3x weekly prophylaxis included, LEOPOLD II Study"
         },
         {
           "mean": 8.9,

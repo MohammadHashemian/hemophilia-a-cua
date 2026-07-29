@@ -179,6 +179,8 @@ class TestPSASampler:
             bleeding_rate=Parameter(Constant(22.0)),
             joint_bleeding_fraction=Parameter(Constant(0.3)),
             life_threatening_bleeding_fraction=Parameter(Constant(0.05)),
+            life_threatening_bleeding_rate=Parameter(Constant(0.5)),
+            ltb_case_fatality=Parameter(Constant(0.35)),
             baseline_age=Parameter(Constant(2)),
             weight_factor=Parameter(Constant(1.0)),
             benefits_discount_rate=Parameter(Constant(0.0)),
@@ -209,6 +211,8 @@ class TestPSASampler:
             bleeding_rate=Parameter(Constant(22.0)),
             joint_bleeding_fraction=Parameter(Constant(0.3)),
             life_threatening_bleeding_fraction=Parameter(Constant(0.05)),
+            life_threatening_bleeding_rate=Parameter(Constant(0.5)),
+            ltb_case_fatality=Parameter(Constant(0.35)),
             baseline_age=Parameter(Constant(2)),
             weight_factor=Parameter(Constant(1.0)),
             benefits_discount_rate=Parameter(Constant(0.0)),
@@ -236,17 +240,48 @@ class TestPSASampler:
 
 
 class TestParameterResolver:
-    def test_resolve_samples_adds_derived_rates(self):
+    def test_default_mode_is_fraction_of_abr(self):
+        samples = {
+            "bleeding_rate": np.array([20.0]),
+            "joint_bleeding_fraction": np.array([0.75]),
+            "life_threatening_bleeding_fraction": np.array([0.025]),
+        }
+        resolved = ParameterResolver.resolve_samples(samples)
+        assert np.allclose(resolved["life_threatening_bleeding_rate"], [0.5])
+
+    def test_resolve_samples_fraction_mode_adds_derived_rates(self):
         samples = {
             "bleeding_rate": np.array([22.0, 15.0]),
             "joint_bleeding_fraction": np.array([0.3, 0.25]),
             "life_threatening_bleeding_fraction": np.array([0.05, 0.03]),
         }
-        resolved = ParameterResolver.resolve_samples(samples)
+        resolved = ParameterResolver.resolve_samples(samples, ltb_mode="fraction")
         assert "spontaneous_bleeding_rate" in resolved
         assert "joint_bleeding_rate" in resolved
         assert "life_threatening_bleeding_rate" in resolved
         assert np.allclose(resolved["spontaneous_bleeding_rate"], [22.0 * (1 - 0.3 - 0.05), 15.0 * (1 - 0.25 - 0.03)])
+        # LTB scales with ABR in fraction mode
+        assert np.allclose(resolved["life_threatening_bleeding_rate"], [22.0 * 0.05, 15.0 * 0.03])
+
+    def test_resolve_samples_absolute_mode_uses_sampled_rate(self):
+        samples = {
+            "bleeding_rate": np.array([22.0, 15.0]),
+            "joint_bleeding_fraction": np.array([0.3, 0.25]),
+            "life_threatening_bleeding_rate": np.array([0.0074, 0.011]),
+        }
+        resolved = ParameterResolver.resolve_samples(samples, ltb_mode="absolute")
+        # ABR is split only between spontaneous and joint bleeding
+        assert np.allclose(resolved["spontaneous_bleeding_rate"], [22.0 * (1 - 0.3), 15.0 * (1 - 0.25)])
+        assert np.allclose(resolved["joint_bleeding_rate"], [22.0 * 0.3, 15.0 * 0.25])
+        # LTB is independent of ABR in absolute mode
+        assert np.allclose(
+            resolved["life_threatening_bleeding_rate"], [0.0074, 0.011]
+        )
+
+    def test_resolve_samples_invalid_mode_raises(self):
+        samples = {"bleeding_rate": np.array([22.0]), "joint_bleeding_fraction": np.array([0.3])}
+        with pytest.raises(ValueError, match="Unknown ltb_mode"):
+            ParameterResolver.resolve_samples(samples, ltb_mode="bogus")
 
     def test_build_single_returns_model_input(self):
         from app.domain.inputs import ModelInput
@@ -256,6 +291,7 @@ class TestParameterResolver:
             "spontaneous_bleeding_rate": np.array([14.3]),
             "joint_bleeding_rate": np.array([6.6]),
             "life_threatening_bleeding_rate": np.array([1.1]),
+            "ltb_case_fatality": np.array([0.35]),
             "baseline_age": np.array([2]),
             "weight_factor": np.array([1.0]),
             "benefits_discount_rate": np.array([0.0]),

@@ -130,27 +130,57 @@ def test_batch_walk_zero_steps():
     assert np.all(result.sequences[:, 0] == 1)
 
 
-def test_batch_walk_mortality_modifier_skipped_non_year_boundary():
-    """Mortality modifier should be a no-op on non-year-boundary steps."""
+def test_batch_walk_mortality_applied_every_week():
+    """Mortality adjustment applies every week with the weekly death
+    probability of the patient's current age band (not only at year
+    boundaries). With an identity matrix and a 0.5 weekly death
+    probability, all iters must die within a few weeks."""
     n = 3
     n_iters = 2
     matrices = np.tile(np.eye(n), (n_iters, 1, 1))
     mask = np.zeros((n_iters, n), dtype=bool)
+    mask[:, 2] = True  # 'dead' absorbing
 
-    # Mortality rate only matters at year boundary
+    # Weekly death probabilities per age (already converted upstream).
     mortality = np.array([0.5, 0.5] + [0.0] * 118)
     batch = BatchMarkovChain(
         matrices=matrices,
         absorbing_mask=mask,
         death_idx=2,
         lt_bleeding_idx=-1,
-        mortality_rates_per_age=mortality,
+        mortality_weekly_prob_per_age=mortality,
     )
     rng = np.random.default_rng(0)
-    # Steps not aligned with year (52) boundary
     result = batch.walk_batch(steps=10, entrance_idx=0, rng=rng)
-    # All iters stay at state 0 since no transitions defined
-    assert np.all(result.sequences == 0)
+    # Every iter must have transitioned to the absorbing death state.
+    assert np.all(result.sequences[:, -1] == 2)
+    assert np.all(result.absorbed_at <= 10)
+
+
+def test_batch_walk_mortality_uses_baseline_age_offset():
+    """The mortality age band must include the baseline age at model
+    entry: with baseline_age=2, step 0 already looks up age band 2."""
+    n = 3
+    n_iters = 2
+    matrices = np.tile(np.eye(n), (n_iters, 1, 1))
+    mask = np.zeros((n_iters, n), dtype=bool)
+    mask[:, 2] = True
+
+    # Only age band 2 carries a death probability; bands 0-1 are zero.
+    mortality = np.array([0.0, 0.0, 1.0] + [0.0] * 117)
+    batch = BatchMarkovChain(
+        matrices=matrices,
+        absorbing_mask=mask,
+        death_idx=2,
+        lt_bleeding_idx=-1,
+        mortality_weekly_prob_per_age=mortality,
+        baseline_age=2,
+    )
+    rng = np.random.default_rng(0)
+    result = batch.walk_batch(steps=10, entrance_idx=0, rng=rng)
+    # Age band 2 applies from step 0 -> everyone dies immediately.
+    assert np.all(result.sequences[:, -1] == 2)
+    assert np.all(result.absorbed_at <= 10)
 
 
 def test_batch_walk_invalid_input_raises():
@@ -247,6 +277,7 @@ def test_aggregate_qaly_is_continuous_not_integer():
         ModelInput(
             cycle=3, bleeding_rate=15.0, spontaneous_bleeding_rate=10.0,
             joint_bleeding_rate=5.0, life_threatening_bleeding_rate=1.0,
+            ltb_case_fatality=0.35,
             baseline_age=2, weight_factor=1.0, benefits_discount_rate=0.03,
             healthy_utility=0.9, mild_arthropathy_utility=0.85,
             moderate_arthropathy_utility=0.7, severe_arthropathy_utility=0.5,
