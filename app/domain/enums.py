@@ -7,10 +7,15 @@ class Regime(StrEnum):
 
 
 class HealthStates(StrEnum):
-    HEALTHY = "healthy"
+    # ``healthy`` remains the serialized value so existing cached results
+    # stay readable. Conceptually this is the event-free No Bleeding state;
+    # arthropathy severity is tracked separately.
+    NO_BLEEDING = "healthy"
+    HEALTHY = "healthy"  # Backward-compatible alias.
     BLEEDING = "bleeding"
     HEMARTHROSIS = "hemarthrosis"
-    LT_BLEEDING = "lt_bleeding"
+    INTRACRANIAL_HEMORRHAGE = "intracranial_hemorrhage"
+    NON_ICH_MAJOR_BLEEDING = "non_ich_major_bleeding"
     DEATH = "death"
 
 
@@ -21,7 +26,8 @@ class UtilityStates(StrEnum):
     SEVERE_ARTHROPATHY = "severe_arthropathy"
     BLEEDING = "bleeding"
     HEMARTHROSIS = "hemarthrosis"
-    LT_BLEEDING = "lt_bleeding"
+    INTRACRANIAL_HEMORRHAGE = "intracranial_hemorrhage"
+    NON_ICH_MAJOR_BLEEDING = "non_ich_major_bleeding"
     DEATH = "death"
 
 

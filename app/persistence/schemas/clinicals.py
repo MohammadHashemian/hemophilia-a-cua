@@ -1,39 +1,41 @@
-from pydantic import BaseModel
+from app.persistence.schemas.metadata import InputMetadata
 
 
-class EventFractions(BaseModel):
+class EventFractions(InputMetadata):
     ajbr_fraction: float
-    ltb_fraction: float
+    non_ich_major_bleeding_fraction: float
 
 
-class LTBRate(BaseModel):
+class ICHRate(InputMetadata):
     on_demand: float
     prophylaxis: float
 
 
-class EventRates(BaseModel):
-    ltb_rate: LTBRate
+class EventRates(InputMetadata):
+    intracranial_hemorrhage_rate: ICHRate
 
 
-class Epidemiology(BaseModel):
+class Epidemiology(InputMetadata):
     event_fractions: EventFractions
     event_rates: EventRates
-    # Conditional probability of death per life-threatening bleeding
-    # episode. Base value 0.35 follows the Zwagemaker et al. (2021)
-    # meta-analysis (ICH mortality 0.8 vs incidence 2.3 per 1000 PY).
-    ltb_case_fatality: float = 0.35
+    ich_case_fatality: float = 0.10
+    ich_case_fatality_description: str | None = None
+    ich_case_fatality_reference: str | list[str] | None = None
+    non_ich_case_fatality: float = 0.0
+    non_ich_case_fatality_description: str | None = None
+    non_ich_case_fatality_reference: str | list[str] | None = None
 
 
-class UtilityDecrements(BaseModel):
+class UtilityDecrements(InputMetadata):
     on_demand: float
     prophylaxis: float
 
 
-class Utilities(BaseModel):
+class Utilities(InputMetadata):
     decrements: UtilityDecrements
 
 
-class StudyEstimate(BaseModel):
+class StudyEstimate(InputMetadata):
     mean: float
     sd: float
     size: float
@@ -41,43 +43,44 @@ class StudyEstimate(BaseModel):
     doi: str | None = None
 
 
-class ABREvidence(BaseModel):
+class ABREvidence(InputMetadata):
     on_demand: list[StudyEstimate]
     prophylaxis: list[StudyEstimate]
 
 
-class Evidence(BaseModel):
+class Evidence(InputMetadata):
     abr: ABREvidence
 
 
-class PetterssonThresholds(BaseModel):
+class PetterssonThresholds(InputMetadata):
     mild: int
     moderate: int
     max: int
 
 
-class PetterssonScore(BaseModel):
+class PetterssonScore(InputMetadata):
     conversion_factor: float
     thresholds: PetterssonThresholds
 
 
-class ClinicalScoring(BaseModel):
+class ClinicalScoring(InputMetadata):
     pettersson_score: PetterssonScore
 
 
-class Dosing(BaseModel):
+class Dosing(InputMetadata):
     ir_prophylaxis_weekly_dose_ui: float
     standard_prophylaxis_weekly_dose_ui: float
     bleeding_dose_ui: float
     joint_bleeding_dose_ui: float
-    lt_bleeding_dose_ui: float
+    intracranial_hemorrhage_dose_ui: float
+    non_ich_major_bleeding_dose_ui: float
 
 
-class Treatment(BaseModel):
+class Treatment(InputMetadata):
     dosing: Dosing
 
 
-class ClinicalFile(BaseModel):
+class ClinicalFile(InputMetadata):
     epidemiology: Epidemiology
     utilities: Utilities
     clinical_scoring: ClinicalScoring

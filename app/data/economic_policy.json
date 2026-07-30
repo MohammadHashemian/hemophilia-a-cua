@@ -1,12 +1,18 @@
 {
+  "description": "Policy assumptions used to construct willingness-to-pay thresholds.",
+  "reference": "Project economic-policy assumptions; GDP and exchange-rate inputs should be updated to a named source and common price year for the final analysis.",
   "currency": "IRR",
   "disease_profile": "rare",
   "gdp_per_capita": {
+    "description": "GDP-per-capita values used in threshold calculations. Currency figures must represent the same year and conversion basis.",
+    "reference": "Existing project values; verify and replace with a dated World Bank, Statistical Center of Iran, or other explicitly selected official source.",
     "USD": 4771.4,
     "IRR": 1800000000,
     "TOMAN": 180000000
   },
   "wtp_multiplier": {
+    "description": "Multipliers applied to GDP per capita for standard and rare-disease threshold scenarios. These are policy scenarios, not empirical treatment-effect inputs.",
+    "reference": "Project policy assumptions. The value of 3 reflects a legacy GDP-multiple convention; the rare-disease value of 10 is an explicit scenario assumption and should not be presented as an official Iranian threshold.",
     "standard": 3,
     "rare": 10
   }

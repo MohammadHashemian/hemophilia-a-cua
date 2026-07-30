@@ -27,10 +27,10 @@ class HorizonSpec:
 
 CHILDHOOD = HorizonSpec(
     key="childhood",
-    directory="childhood_age_2_12",
-    label="Childhood horizon (ages 2–12)",
-    start_age=2,
-    end_age=12,
+    directory="childhood_age_1_15",
+    label="Childhood horizon (ages 1–15)",
+    start_age=1,
+    end_age=15,
 )
 LIFETIME = HorizonSpec(
     key="lifetime",
@@ -43,6 +43,7 @@ LIFETIME = HorizonSpec(
 _HORIZONS = {
     CHILDHOOD.key: CHILDHOOD,
     CHILDHOOD.directory: CHILDHOOD,
+    "childhood_age_2_12": CHILDHOOD,  # legacy directory name
     "early": CHILDHOOD,  # legacy scenario/cache name
     LIFETIME.key: LIFETIME,
     LIFETIME.directory: LIFETIME,
@@ -70,10 +71,16 @@ def _base_pair(
             name=f"{horizon.key} on-demand {sampling_method}",
             regime=Regime.ON_DEMAND,
             overrides={
+                "baseline_age": Parameter(
+                    distribution=Constant(value=horizon.start_age)
+                ),
                 "cycles": Parameter(distribution=Constant(value=horizon.cycles)),
                 "bleeding_rate": Parameter(
                     distribution=Constant(value=0),
                     cache=meta_samples["on_demand"][sampling_method],
+                ),
+                "intracranial_hemorrhage_rate": Parameter(
+                    distribution=TriangularDist(left=0.005, mode=0.010, right=0.017)
                 ),
             },
         ),
@@ -81,10 +88,16 @@ def _base_pair(
             name=f"{horizon.key} prophylaxis {sampling_method}",
             regime=Regime.PROPHYLAXIS,
             overrides={
+                "baseline_age": Parameter(
+                    distribution=Constant(value=horizon.start_age)
+                ),
                 "cycles": Parameter(distribution=Constant(value=horizon.cycles)),
                 "bleeding_rate": Parameter(
                     distribution=Constant(value=0),
                     cache=meta_samples["prophylaxis"][sampling_method],
+                ),
+                "intracranial_hemorrhage_rate": Parameter(
+                    distribution=Constant(value=0.00033)
                 ),
             },
         ),
@@ -110,8 +123,8 @@ def build_psa_scenarios(
         define_scenario_extension(
             scenarios=base,
             extensions={
-                "ltb_absolute": {
-                    "life_threatening_bleeding_rate": ltb_absolute,
+                "ich_pooled": {
+                    "intracranial_hemorrhage_rate": ltb_absolute,
                 }
             },
         )

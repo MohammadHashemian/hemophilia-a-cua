@@ -1,4 +1,6 @@
 {
+  "description": "Legacy age-specific background mortality input retained for comparison. This is not the selected Iran base-case file.",
+  "reference": "Legacy Poland input from the original project; the exact primary life-table citation is not recorded in this JSON and must be recovered before reuse.",
   "use_age_specific": true,
   "crude_annual_rate": 0.0128,
   "age_specific": {

@@ -95,8 +95,8 @@ class TestPetterssonToSeverity:
 
 
 class TestEventCount:
-    def test_lt_bleeding_always_one(self):
-        count = event_count(step=0, state="lt_bleeding", const={"lam_bleed": 1.0, "lam_joint": 1.0}, rng=np.random.default_rng(42))
+    def test_major_bleeding_always_one(self):
+        count = event_count(step=0, state="intracranial_hemorrhage", const={"lam_bleed": 1.0, "lam_joint": 1.0}, rng=np.random.default_rng(42))
         assert count == 1
 
     def test_healthy_returns_zero(self):
@@ -153,9 +153,9 @@ class TestConsumption:
         c = consumption(step=0, state="bleeding", regime=Regime.ON_DEMAND, weight=70.0, event_count=3, inputs=inputs)
         assert abs(c - 70.0 * 10 * 3) < 1e-6
 
-    def test_lt_bleeding_consumption(self):
-        inputs = type("obj", (object,), {"prophylaxis_background_factor_consumption_per_kg": 0, "factor_consumption_per_spontaneous_bleeding_per_kg": 10, "factor_consumption_per_joint_bleeding_per_kg": 20, "factor_consumption_per_life_threatening_bleeding_per_kg": 50})()
-        c = consumption(step=0, state="lt_bleeding", regime=Regime.ON_DEMAND, weight=70.0, event_count=0, inputs=inputs)
+    def test_ich_consumption(self):
+        inputs = type("obj", (object,), {"prophylaxis_background_factor_consumption_per_kg": 0, "factor_consumption_per_spontaneous_bleeding_per_kg": 10, "factor_consumption_per_joint_bleeding_per_kg": 20, "factor_consumption_per_intracranial_hemorrhage_per_kg": 50})()
+        c = consumption(step=0, state="intracranial_hemorrhage", regime=Regime.ON_DEMAND, weight=70.0, event_count=0, inputs=inputs)
         assert abs(c - 70.0 * 50) < 1e-6
 
 

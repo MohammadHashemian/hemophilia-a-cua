@@ -31,11 +31,9 @@ Returns (n_iters,) ndarray of the per-iter reward value at the current step.
 from __future__ import annotations
 
 import numpy as np
+from scipy.stats import poisson
 
-from utils.math import (
-    build_zero_truncated_poisson_probs,
-    cal_body_weight,
-)
+from utils.math import cal_body_weight
 
 # State name -> index (filled by setup_vectorized_rewards)
 _STATE_IDX: dict[str, int] = {}
@@ -43,6 +41,32 @@ _STATE_IDX: dict[str, int] = {}
 
 def register_state_index(name: str, idx: int) -> None:
     _STATE_IDX[name] = idx
+
+
+def _sample_zero_truncated_poisson(
+    lam: np.ndarray,
+    uniform: np.ndarray,
+) -> np.ndarray:
+    """Draw ``Poisson(lam)`` values conditional on being at least one."""
+    lam = np.asarray(lam, dtype=np.float64)
+    uniform = np.asarray(uniform, dtype=np.float64)
+    if lam.shape != uniform.shape:
+        raise ValueError("lam and uniform must have identical shapes")
+
+    # Preserve the legacy fallback: invalid/non-positive rates yield one
+    # when an iteration is already known to occupy an event state.
+    draws = np.ones(lam.shape, dtype=np.float64)
+    valid = np.isfinite(lam) & (lam > 0.0)
+    if not valid.any():
+        return draws
+
+    valid_lam = lam[valid]
+    p_zero = np.exp(-valid_lam)
+    quantiles = p_zero + uniform[valid] * (1.0 - p_zero)
+    quantiles = np.minimum(quantiles, np.nextafter(1.0, 0.0))
+    sampled = poisson.ppf(quantiles, valid_lam)
+    draws[valid] = np.maximum(sampled, 1.0)
+    return draws
 
 
 # ----------------------- Store functions -----------------------
@@ -79,17 +103,18 @@ def store_event_count(step, state_idx, store_arrays, shared_kwargs, rng):
 
     bleeding_idx = _STATE_IDX["bleeding"]
     hemarthrosis_idx = _STATE_IDX["hemarthrosis"]
-    lt_bleeding_idx = _STATE_IDX["lt_bleeding"]
+    ich_idx = _STATE_IDX["intracranial_hemorrhage"]
+    non_ich_idx = _STATE_IDX["non_ich_major_bleeding"]
 
     n_iters = state_idx.shape[0]
     out = np.zeros(n_iters, dtype=np.float64)
 
     in_bleeding = state_idx == bleeding_idx
     in_hemarthrosis = state_idx == hemarthrosis_idx
-    in_lt = state_idx == lt_bleeding_idx
+    in_acute_major = (state_idx == ich_idx) | (state_idx == non_ich_idx)
 
     # Exactly one LTB episode per LTB-state week (scalar parity)
-    out[in_lt] = 1.0
+    out[in_acute_major] = 1.0
 
     in_any = in_bleeding | in_hemarthrosis
 
@@ -102,28 +127,10 @@ def store_event_count(step, state_idx, store_arrays, shared_kwargs, rng):
     lam[in_hemarthrosis] = lam_joint[in_hemarthrosis]
 
     # k_max from Poisson(lam) ppf(0.9999) — cap at 50 for safety
-    # Compute k_max vectorized
-    k_max = np.minimum(np.ceil(lam + 4.0 * np.sqrt(lam) + 1).astype(np.int64), 50)
-    k_max = np.maximum(k_max, 1)
-
-    # Vectorized categorical sampling using uniform draws
-    # For each iter, build a cumulative distribution and sample
+    # A single vectorized inverse-CDF operation replaces the former Python
+    # loop that rebuilt a truncated PMF for every active iteration.
     u = rng.random(n_iters)
-
-    # We process per unique (k_max, lam) to amortize build_zero_truncated_poisson_probs.
-    # For simplicity, build per-iter inline (k_max usually small).
-    for i in np.where(in_any)[0]:
-        km = int(k_max[i])
-        if km < 1:
-            out[i] = 0.0
-            continue
-        k_values, probs = build_zero_truncated_poisson_probs(float(lam[i]), km)
-        # Sample: searchsorted on cumsum
-        cumsum = np.cumsum(probs)
-        idx = int(np.searchsorted(cumsum, u[i]))
-        if idx >= km:
-            idx = km - 1
-        out[i] = float(k_values[idx])
+    out[in_any] = _sample_zero_truncated_poisson(lam[in_any], u[in_any])
 
     return out
 
@@ -167,7 +174,8 @@ def reward_consumption(step, state_idx, store_arrays, shared_kwargs, rng):
     death_idx = _STATE_IDX["death"]
     bleeding_idx = _STATE_IDX["bleeding"]
     hemarthrosis_idx = _STATE_IDX["hemarthrosis"]
-    lt_bleeding_idx = _STATE_IDX["lt_bleeding"]
+    ich_idx = _STATE_IDX["intracranial_hemorrhage"]
+    non_ich_idx = _STATE_IDX["non_ich_major_bleeding"]
 
     dose = np.zeros(state_idx.shape, dtype=np.float64)
 
@@ -184,7 +192,8 @@ def reward_consumption(step, state_idx, store_arrays, shared_kwargs, rng):
 
     in_bleeding = state_idx == bleeding_idx
     in_hemarthrosis = state_idx == hemarthrosis_idx
-    in_lt = state_idx == lt_bleeding_idx
+    in_ich = state_idx == ich_idx
+    in_non_ich = state_idx == non_ich_idx
 
     dose = dose + np.where(
         in_bleeding & ~in_death,
@@ -199,8 +208,13 @@ def reward_consumption(step, state_idx, store_arrays, shared_kwargs, rng):
         0.0,
     )
     dose = dose + np.where(
-        in_lt & ~in_death,
-        weight * per_iter["factor_consumption_per_life_threatening_bleeding_per_kg"],
+        in_ich & ~in_death,
+        weight * per_iter["factor_consumption_per_intracranial_hemorrhage_per_kg"],
+        0.0,
+    )
+    dose = dose + np.where(
+        in_non_ich & ~in_death,
+        weight * per_iter["factor_consumption_per_non_ich_major_bleeding_per_kg"],
         0.0,
     )
     return dose
@@ -238,12 +252,14 @@ def reward_utility(step, state_idx, store_arrays, shared_kwargs, rng):
     healthy_idx = _STATE_IDX["healthy"]
     bleeding_idx = _STATE_IDX["bleeding"]
     hemarthrosis_idx = _STATE_IDX["hemarthrosis"]
-    lt_bleeding_idx = _STATE_IDX["lt_bleeding"]
+    ich_idx = _STATE_IDX["intracranial_hemorrhage"]
+    non_ich_idx = _STATE_IDX["non_ich_major_bleeding"]
     death_idx = _STATE_IDX["death"]
 
     util_bleed = per_iter["spontaneous_bleeding_utility"]
     util_hem = per_iter["joint_bleeding_utility"]
-    util_lt = per_iter["life_threatening_bleeding_utility"]
+    util_ich = per_iter["intracranial_hemorrhage_utility"]
+    util_non_ich = per_iter["non_ich_major_bleeding_utility"]
     util_death = per_iter["death_utility"]
 
     acute = np.where(
@@ -256,9 +272,13 @@ def reward_utility(step, state_idx, store_arrays, shared_kwargs, rng):
                 state_idx == hemarthrosis_idx,
                 util_hem,
                 np.where(
-                    state_idx == lt_bleeding_idx,
-                    util_lt,
-                    np.where(state_idx == death_idx, util_death, arth),
+                    state_idx == ich_idx,
+                    util_ich,
+                    np.where(
+                        state_idx == non_ich_idx,
+                        util_non_ich,
+                        np.where(state_idx == death_idx, util_death, arth),
+                    ),
                 ),
             ),
         ),

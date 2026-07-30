@@ -10,12 +10,11 @@ class ParameterSet:
     # Transition builder inputs
     bleeding_rate: Parameter
     joint_bleeding_fraction: Parameter
-    # LTB, modeled as a fraction of ABR ("fraction" mode)
-    life_threatening_bleeding_fraction: Parameter
-    # LTB, modeled as an absolute annual rate ("absolute" mode)
-    life_threatening_bleeding_rate: Parameter
-    # Conditional case-fatality probability per LTB episode
-    ltb_case_fatality: Parameter
+    intracranial_hemorrhage_rate: Parameter
+    gi_neck_bleeding_fraction: Parameter
+    iliopsoas_bleeding_fraction: Parameter
+    ich_case_fatality: Parameter
+    non_ich_case_fatality: Parameter
 
     # weight control
     baseline_age: Parameter
@@ -31,7 +30,8 @@ class ParameterSet:
     severe_arthropathy_utility: Parameter
     spontaneous_bleeding_utility: Parameter
     joint_bleeding_utility: Parameter
-    life_threatening_bleeding_utility: Parameter
+    intracranial_hemorrhage_utility: Parameter
+    non_ich_major_bleeding_utility: Parameter
     death_utility: Parameter
 
     # ---- Costs calculation ----
@@ -41,4 +41,5 @@ class ParameterSet:
     prophylaxis_background_factor_consumption_per_kg: Parameter
     factor_consumption_per_spontaneous_bleeding_per_kg: Parameter
     factor_consumption_per_joint_bleeding_per_kg: Parameter
-    factor_consumption_per_life_threatening_bleeding_per_kg: Parameter
+    factor_consumption_per_intracranial_hemorrhage_per_kg: Parameter
+    factor_consumption_per_non_ich_major_bleeding_per_kg: Parameter

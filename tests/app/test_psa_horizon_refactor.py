@@ -27,10 +27,13 @@ def _meta_samples(n: int = 10) -> dict:
 
 
 def test_horizon_specs_are_age_explicit():
-    assert CHILDHOOD.cycles == 10 * 52
+    assert CHILDHOOD.start_age == 1
+    assert CHILDHOOD.end_age == 15
+    assert CHILDHOOD.cycles == 14 * 52
     assert LIFETIME.cycles == 98 * 52
     assert get_horizon("early") is CHILDHOOD
     assert get_horizon("childhood_age_2_12") is CHILDHOOD
+    assert get_horizon("childhood_age_1_15") is CHILDHOOD
 
 
 def test_each_horizon_builds_only_its_16_scenarios():
@@ -46,6 +49,9 @@ def test_each_horizon_builds_only_its_16_scenarios():
         assert {
             s.overrides["cycles"].distribution.point() for s in scenarios
         } == {horizon.cycles}
+        assert {
+            s.overrides["baseline_age"].distribution.point() for s in scenarios
+        } == {horizon.start_age}
 
 
 def test_new_psa_notebooks_are_valid_and_separated():

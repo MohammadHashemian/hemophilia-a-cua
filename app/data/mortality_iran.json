@@ -1,4 +1,6 @@
 {
+  "description": "Male Iranian all-cause background mortality rates by age. Annual rates are converted to cycle probabilities inside the model.",
+  "reference": "United Nations DESA, Population Division. World Population Prospects 2024.",
   "use_age_specific": true,
   "crude_annual_rate": 0.005227549788845551,
   "age_specific": {

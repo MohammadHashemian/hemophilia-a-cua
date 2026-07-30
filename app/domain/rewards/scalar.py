@@ -5,7 +5,7 @@ from utils.math import build_zero_truncated_poisson_probs, cal_body_weight
 
 
 def event_count(step: int, state: str, **kwargs) -> int:
-    if state == "lt_bleeding":
+    if state in {"intracranial_hemorrhage", "non_ich_major_bleeding"}:
         return 1
 
     if state not in ["bleeding", "hemarthrosis"]:
@@ -61,9 +61,15 @@ def consumption(step: int, state: str, **kwargs) -> float:
     elif state == "hemarthrosis":
         dose += weight_val * inputs.factor_consumption_per_joint_bleeding_per_kg * k
 
-    elif state == "lt_bleeding":
+    elif state == "intracranial_hemorrhage":
         dose += (
-            weight_val * inputs.factor_consumption_per_life_threatening_bleeding_per_kg
+            weight_val
+            * inputs.factor_consumption_per_intracranial_hemorrhage_per_kg
+        )
+    elif state == "non_ich_major_bleeding":
+        dose += (
+            weight_val
+            * inputs.factor_consumption_per_non_ich_major_bleeding_per_kg
         )
 
     return dose

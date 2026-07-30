@@ -104,7 +104,8 @@ def _init_worker(inputs: ModelInput, context: ModelContext):
         healthy=inp.healthy_utility,
         bleeding=inp.spontaneous_bleeding_utility,
         hemarthrosis=inp.joint_bleeding_utility,
-        lt_bleeding=inp.life_threatening_bleeding_utility,
+        intracranial_hemorrhage=inp.intracranial_hemorrhage_utility,
+        non_ich_major_bleeding=inp.non_ich_major_bleeding_utility,
         death=inp.death_utility,
         mild_arthropathy=inp.mild_arthropathy_utility,
         moderate_arthropathy=inp.moderate_arthropathy_utility,
@@ -241,8 +242,11 @@ def _build_shared_per_iter(inputs: list[ModelInput], states: list[str]) -> dict:
         "joint_bleeding_utility": np.array(
             [inp.joint_bleeding_utility for inp in inputs], dtype=np.float64
         ),
-        "life_threatening_bleeding_utility": np.array(
-            [inp.life_threatening_bleeding_utility for inp in inputs], dtype=np.float64
+        "intracranial_hemorrhage_utility": np.array(
+            [inp.intracranial_hemorrhage_utility for inp in inputs], dtype=np.float64
+        ),
+        "non_ich_major_bleeding_utility": np.array(
+            [inp.non_ich_major_bleeding_utility for inp in inputs], dtype=np.float64
         ),
         "death_utility": np.array(
             [inp.death_utility for inp in inputs], dtype=np.float64
@@ -265,8 +269,12 @@ def _build_shared_per_iter(inputs: list[ModelInput], states: list[str]) -> dict:
             [inp.factor_consumption_per_joint_bleeding_per_kg for inp in inputs],
             dtype=np.float64,
         ),
-        "factor_consumption_per_life_threatening_bleeding_per_kg": np.array(
-            [inp.factor_consumption_per_life_threatening_bleeding_per_kg for inp in inputs],
+        "factor_consumption_per_intracranial_hemorrhage_per_kg": np.array(
+            [inp.factor_consumption_per_intracranial_hemorrhage_per_kg for inp in inputs],
+            dtype=np.float64,
+        ),
+        "factor_consumption_per_non_ich_major_bleeding_per_kg": np.array(
+            [inp.factor_consumption_per_non_ich_major_bleeding_per_kg for inp in inputs],
             dtype=np.float64,
         ),
     }

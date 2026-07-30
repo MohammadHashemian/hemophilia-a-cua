@@ -1,22 +1,22 @@
 from typing import Literal
 
-from pydantic import BaseModel
+from app.persistence.schemas.metadata import InputMetadata
 
 MortalitySource = Literal["iran", "poland", "default"]
 
 
-class Environment(BaseModel):
+class Environment(InputMetadata):
     mode: Literal["development", "production"]
     seed: int
 
 
-class Discounting(BaseModel):
+class Discounting(InputMetadata):
     enable: bool
     cost_rate_annual: float
     utility_rate_annual: float
 
 
-class PSA(BaseModel):
+class PSA(InputMetadata):
     development: int
     production: int
 
@@ -24,7 +24,7 @@ class PSA(BaseModel):
         return getattr(self, mode)
 
 
-class Mortality(BaseModel):
+class Mortality(InputMetadata):
     """Selects which mortality table the model loads at startup.
 
     ``"iran"``     -> ``data/mortality_iran.json``  (UN WPP 2024, Male, Iran)
@@ -35,11 +35,11 @@ class Mortality(BaseModel):
     source: MortalitySource = "iran"
 
 
-class Time(BaseModel):
+class Time(InputMetadata):
     weeks_per_year: int
 
 
-class SimulationFile(BaseModel):
+class SimulationFile(InputMetadata):
     environment: Environment
     discounting: Discounting
     psa: PSA

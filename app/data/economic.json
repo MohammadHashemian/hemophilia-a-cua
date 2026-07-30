@@ -1,16 +1,24 @@
 {
+  "description": "Currency definitions and factor VIII acquisition-cost assumptions.",
+  "reference": "Project costing file. Prices must be accompanied by a dated Iranian procurement, pharmacy, or payer source before the final analysis.",
   "currencies": [
     {
+      "description": "Iranian rial, the model's base costing currency.",
+      "reference": "ISO 4217 currency code IRR.",
       "name": "Iranian Rial",
       "code": "IRR",
       "symbol": "﷼"
     },
     {
+      "description": "Toman display unit, represented as 10 Iranian rials.",
+      "reference": "Iranian accounting convention used by the project.",
       "name": "Toman",
       "code": "T",
       "symbol": "T"
     },
     {
+      "description": "US dollar used only for reporting or conversion checks.",
+      "reference": "ISO 4217 currency code USD.",
       "name": "US Dollar",
       "code": "USD",
       "symbol": "$"
@@ -18,16 +26,26 @@
   ],
   "costs": [
     {
+      "description": "Factor VIII concentrate acquisition cost used to value prophylaxis and event-treatment doses.",
+      "reference": "Existing project price assumption; replace or confirm with a dated Iranian procurement/pharmacy source and record the price year.",
       "item": "factor_viii",
       "assumption": {
+        "description": "Potency conversion used to derive price per microgram from price per international unit.",
+        "reference": "Existing project conversion assumption; verify against the specific product label or pharmacopoeial source.",
         "iu_per_microgram": 5
       },
       "pricing": {
+        "description": "Equivalent factor VIII prices expressed per international unit and per microgram.",
+        "reference": "Existing project price assumption; IRR and toman values use 10 IRR per toman, while the USD figure depends on the project's exchange-rate convention.",
+        "per_unit_description": "Acquisition price per international unit.",
+        "per_unit_reference": "Existing project assumption; dated local source not yet documented.",
         "per_unit": {
           "IRR": 58000,
           "T": 5800,
           "USD": 0.075
         },
+        "per_microgram_description": "Derived acquisition price per microgram using iu_per_microgram.",
+        "per_microgram_reference": "Calculated from per-unit prices and the stated conversion assumption.",
         "per_microgram": {
           "IRR": 290000,
           "T": 29000,

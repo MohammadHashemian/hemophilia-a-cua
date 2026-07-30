@@ -32,14 +32,20 @@ columns = [
     "pettersson_score",
     "absorbed_at",
     "is_absorbed",
+    "death_cause",
+    "ich_death",
+    "non_ich_death",
+    "background_death",
     "bleeding_events",
     "spontaneous_bleeding_events",
     "joint_bleeding_events",
-    "life_threatening_events",
+    "intracranial_hemorrhage_events",
+    "non_ich_major_bleeding_events",
     "annual_bleeding_rate",
     "spontaneous_bleeding_rate",
     "annual_joint_bleeding_rate",
-    "annual_life_threatening_rate",
+    "annual_intracranial_hemorrhage_rate",
+    "annual_non_ich_major_bleeding_rate",
 ]
 
 occupation_columns = [
@@ -49,8 +55,10 @@ occupation_columns = [
     "bleeding_share",
     "hemarthrosis_weeks",
     "hemarthrosis_share",
-    "lt_bleeding_weeks",
-    "lt_bleeding_share",
+    "intracranial_hemorrhage_weeks",
+    "intracranial_hemorrhage_share",
+    "non_ich_major_bleeding_weeks",
+    "non_ich_major_bleeding_share",
     "death_weeks",
     "death_share",
 ]
@@ -186,14 +194,28 @@ def build_df(
             sum(ec for s, ec in zip(seq, event_seq) if s == "hemarthrosis")
         )
 
-        life_threatening_events = int(
-            sum(ec for s, ec in zip(seq, event_seq) if s == "lt_bleeding")
+        intracranial_hemorrhage_events = int(
+            sum(ec for s, ec in zip(seq, event_seq) if s == "intracranial_hemorrhage")
+        )
+        non_ich_major_bleeding_events = int(
+            sum(ec for s, ec in zip(seq, event_seq) if s == "non_ich_major_bleeding")
         )
 
         annual_bleeding_rate = bleeding_events / person_years
         spontaneous_bleeding_rate = spontaneous_bleeding_events / person_years
         annual_joint_bleeding_rate = joint_bleeding_events / person_years
-        life_threatening_rate = life_threatening_events / person_years
+        intracranial_hemorrhage_rate = intracranial_hemorrhage_events / person_years
+        non_ich_major_bleeding_rate = non_ich_major_bleeding_events / person_years
+
+        death_cause = None
+        if output.absorbed_at is not None and end > 0:
+            prior_state = output.sequence[end - 1]
+            if prior_state == "intracranial_hemorrhage":
+                death_cause = "intracranial_hemorrhage"
+            elif prior_state == "non_ich_major_bleeding":
+                death_cause = "non_ich_major_bleeding"
+            else:
+                death_cause = "background"
 
         parts = parse_scenario(result.scenario)
         time_horizon, regime, sampling_method, extension = parts
@@ -221,14 +243,20 @@ def build_df(
             "pettersson_score": output.pettersson_score,
             "absorbed_at": output.absorbed_at,
             "is_absorbed": output.absorbed_at is not None,
+            "death_cause": death_cause,
+            "ich_death": death_cause == "intracranial_hemorrhage",
+            "non_ich_death": death_cause == "non_ich_major_bleeding",
+            "background_death": death_cause == "background",
             "bleeding_events": bleeding_events,
             "spontaneous_bleeding_events": spontaneous_bleeding_events,
             "joint_bleeding_events": joint_bleeding_events,
-            "life_threatening_events": life_threatening_events,
+            "intracranial_hemorrhage_events": intracranial_hemorrhage_events,
+            "non_ich_major_bleeding_events": non_ich_major_bleeding_events,
             "annual_bleeding_rate": annual_bleeding_rate,
             "spontaneous_bleeding_rate": spontaneous_bleeding_rate,
             "annual_joint_bleeding_rate": annual_joint_bleeding_rate,
-            "annual_life_threatening_rate": life_threatening_rate,
+            "annual_intracranial_hemorrhage_rate": intracranial_hemorrhage_rate,
+            "annual_non_ich_major_bleeding_rate": non_ich_major_bleeding_rate,
         }
         state_occupation = calculate_state_occupation(
             seq,
@@ -251,6 +279,7 @@ def build_df(
     nullable_casts: dict[str, pl.DataType] = {
         "extension": pl.String,
         "absorbed_at": pl.Float64,
+        "death_cause": pl.String,
     }
     for col, dtype in nullable_casts.items():
         if col in df.columns and df.schema[col] != dtype:

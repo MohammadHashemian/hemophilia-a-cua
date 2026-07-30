@@ -9,14 +9,13 @@ import numpy as np
 import polars as pl
 
 from app.analysis.psa.parameter_resolver import ParameterResolver
-from app.analysis.psa.sampler import PSASampler
 from app.domain.enums import HealthStates
 from app.domain.inputs import ModelInput
 from app.domain.scenario import Scenario, ScenarioBundle
 from app.domain.worker import worker_function, worker_function_batch
 from app.notebook.parameter_sets import HemophiliaParamRepo
 from app.notebook.psa.scenarios import HorizonSpec, build_psa_scenarios, get_horizon
-from app.notebook.scenario_helpers import ltb_mode_for_scenario
+from app.notebook.scenario_helpers import parse_scenario
 from app.notebook.scenario_runner import run_scenarios_in_batches
 from app.persistence.context import ModelContext
 from engine.chains import Chain
@@ -74,16 +73,21 @@ def build_bundles(
     seed = context.simulation.environment.seed
     bundles: list[ScenarioBundle[ModelInput]] = []
     for scenario in scenarios:
-        scenario_seed = stable_hash(seed, scenario.name)
-        sampler = PSASampler(
-            scenario.apply_overrides(base_params),
-            seed=scenario_seed,
-        )
-        raw = sampler.sample(sample_size)
-        resolved = ParameterResolver.resolve_samples(
-            raw,
-            ltb_mode=ltb_mode_for_scenario(scenario.name),
-        )
+        horizon, _regime, sampling_method, extension = parse_scenario(scenario.name)
+        # Both regimes in a cost-effectiveness pair receive the same random
+        # stream for shared PSA parameters. Regime-specific parameters remain
+        # different through their scenario overrides.
+        pairing_key = f"{horizon}|{sampling_method}|{extension or 'base'}"
+        scenario_seed = stable_hash(seed, pairing_key)
+        scenario_params = scenario.apply_overrides(base_params)
+        raw = {}
+        for field in scenario_params.__dataclass_fields__:
+            field_seed = stable_hash(scenario_seed, field)
+            field_rng = np.random.default_rng(field_seed)
+            raw[field] = getattr(scenario_params, field).sample(
+                sample_size, field_rng
+            )
+        resolved = ParameterResolver.resolve_samples(raw)
         inputs = [
             ParameterResolver.build_single(resolved, index)
             for index in range(sample_size)
@@ -147,11 +151,11 @@ def load_horizon_results(horizon: str | HorizonSpec) -> pl.DataFrame:
     # Migration path: permit the new analysis notebooks to read the legacy
     # mixed cache until each separated simulation has been run once.
     legacy = root / "app" / "cache" / "psa" / "parquet" / "all_results_combined.parquet"
-    if legacy.exists():
-        legacy_key = "early" if spec is get_horizon("childhood") else spec.key
-        return pl.read_parquet(legacy).filter(
-            pl.col("time_horizon") == legacy_key
-        )
+    # The legacy childhood results covered ages 2–12 and are not compatible
+    # with the current ages 1–15 definition. Lifetime remains unchanged and
+    # can safely use its legacy rows during migration.
+    if legacy.exists() and spec.key == "lifetime":
+        return pl.read_parquet(legacy).filter(pl.col("time_horizon") == spec.key)
 
     raise FileNotFoundError(
         f"No results at {path}. Run this horizon's 02_simulation.ipynb first."

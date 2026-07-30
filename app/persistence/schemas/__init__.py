@@ -7,7 +7,7 @@ from app.persistence.schemas.clinicals import (
     EventFractions,
     EventRates,
     Evidence,
-    LTBRate,
+    ICHRate,
     PetterssonScore,
     PetterssonThresholds,
     StudyEstimate,
@@ -24,7 +24,7 @@ from app.persistence.schemas.utilities import EventDisutilities, StateUtilities,
 
 __all__ = [
     "EventFractions",
-    "LTBRate",
+    "ICHRate",
     "EventRates",
     "Epidemiology",
     "UtilityDecrements",

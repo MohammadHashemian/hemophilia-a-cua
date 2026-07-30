@@ -1,21 +1,33 @@
 {
+  "description": "Operational simulation settings, discounting conventions, PSA sample sizes, mortality source, and model time unit.",
+  "reference": "Project simulation protocol; these values control analysis execution rather than representing clinical observations.",
   "environment": {
+    "description": "Execution mode and random seed. The fixed seed supports reproducible paired PSA iterations.",
+    "reference": "Project reproducibility convention.",
     "mode": "production",
     "seed": 468498
   },
   "discounting": {
+    "description": "Annual discount rates and switch controlling whether discounting is applied.",
+    "reference": "Existing project economic-evaluation assumptions; confirm against the health-economic guideline selected for the thesis jurisdiction.",
     "enable": false,
     "cost_rate_annual": 0.058,
     "utility_rate_annual": 0.05
   },
   "psa": {
+    "description": "Numbers of probabilistic iterations used for development checks and production analysis.",
+    "reference": "Project computational design choice; production precision should be confirmed using Monte Carlo error or convergence diagnostics.",
     "development": 1000,
     "production": 10000
   },
   "mortality": {
+    "description": "Selects the mortality input file used for background age-specific death rates.",
+    "reference": "The selected Iran file records its own United Nations WPP provenance.",
     "source": "iran"
   },
   "time": {
+    "description": "Number of weekly model cycles treated as one year.",
+    "reference": "Model time-conversion convention.",
     "weeks_per_year": 52
   }
 }

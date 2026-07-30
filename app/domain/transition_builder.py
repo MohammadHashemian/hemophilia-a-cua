@@ -2,12 +2,11 @@ from typing import Any
 
 import numpy as np
 
+from app.domain.enums import HealthStates
 from app.domain.inputs import ModelInput
 from app.persistence.schemas.mortality import MortalityFile
 from engine.modifier import TransitionModifier
-from engine.transitions import HybridTransitionGenerator
 from utils.logging import setup_root_logger
-from utils.math import prob_at_least_one, to_weekly
 
 
 class AgeBasedMortalityModifier(TransitionModifier):
@@ -83,7 +82,7 @@ class AgeBasedMortalityModifier(TransitionModifier):
         **kwargs: Any,
     ) -> np.ndarray:
 
-        if current_state in ["death", "lt_bleeding"]:
+        if current_state == "death":
             return base_probs
 
         # Patient age at this step; the age band only changes at
@@ -116,134 +115,98 @@ class AgeBasedMortalityModifier(TransitionModifier):
         return probs
 
 
-def _add_death_transitions(
-    states: list[str], special_transitions: dict = {}, dt=1.0, *args
-):
+def _weekly_event_distribution(
+    inputs: ModelInput,
+    states: list[str],
+) -> np.ndarray:
+    """Return one fresh weekly competing-risk distribution.
+
+    ``healthy`` is retained as the serialized key for the conceptual
+    No Bleeding state. The remaining destinations are mutually exclusive
+    bleeding-event outcomes within a weekly cycle.
+    """
     state_idx = {state: i for i, state in enumerate(states)}
-    n = len(states)
-    # Absorbing death state
-    death_row = [0.0] * n
-    death_row[state_idx["death"]] = 1.0
-    special_transitions["death"] = death_row
+    event_hazards = {
+        HealthStates.BLEEDING.value: inputs.spontaneous_bleeding_rate / 52.0,
+        HealthStates.HEMARTHROSIS.value: inputs.joint_bleeding_rate / 52.0,
+        HealthStates.INTRACRANIAL_HEMORRHAGE.value: (
+            inputs.intracranial_hemorrhage_rate / 52.0
+        ),
+        HealthStates.NON_ICH_MAJOR_BLEEDING.value: (
+            inputs.non_ich_major_bleeding_rate / 52.0
+        ),
+    }
+    if any(hazard < 0.0 for hazard in event_hazards.values()):
+        raise ValueError("Annual bleeding-event hazards must be non-negative.")
+
+    row = np.zeros(len(states), dtype=float)
+    total_hazard = sum(event_hazards.values())
+    no_bleeding = HealthStates.NO_BLEEDING.value
+    if np.isclose(total_hazard, 0.0):
+        row[state_idx[no_bleeding]] = 1.0
+        return row
+
+    survival = float(np.exp(-total_hazard))
+    event_mass = 1.0 - survival
+    row[state_idx[no_bleeding]] = survival
+    for destination, hazard in event_hazards.items():
+        row[state_idx[destination]] = hazard / total_hazard * event_mass
+    return row
 
 
-def _add_ltb_transitions(
-    states: list[str], special_transitions: dict = {}, dt=1.0, *args
-):
-    p_no_event, spont_rate, joint_rate, life_rate, p_death = args
+def _with_case_fatality(
+    ordinary_row: np.ndarray,
+    case_fatality: float,
+    states: list[str],
+) -> np.ndarray:
+    """Apply acute fatality once, then allocate survivors to the next week."""
     state_idx = {state: i for i, state in enumerate(states)}
-    n = len(states)
-
-    # Event probabilities
-    # p_death = conditional case-fatality of a life-threatening bleeding
-    # episode (evidence: Zwagemaker et al. 2021, ICH mortality/incidence
-    # ~= 0.8/2.3 ~= 0.35). Applied once per LTB-state week.
-    p_healthy = p_no_event  # probability to stay healthy
-
-    p_spont = prob_at_least_one(spont_rate * dt)
-    p_joint = prob_at_least_one(joint_rate * dt)
-    p_life = prob_at_least_one(life_rate * dt)
-
-    lt_row = np.zeros(n)
-
-    remaining_mass = 1.0 - p_healthy - p_death
-    if remaining_mass < 0:
-        p_survive_death = 1 - p_death
-        p_healthy = p_no_event * p_survive_death
-        remaining_mass = p_survive_death - p_healthy
-
-    # fixed assignments
-    lt_row[state_idx["healthy"]] = p_healthy
-    lt_row[state_idx["death"]] = p_death
-
-    raw = np.array([p_spont, p_joint, p_life], dtype=float)
-    raw_sum = raw.sum()
-
-    if raw_sum > 0 and remaining_mass > 0:
-        scaled = raw * (remaining_mass / raw_sum)
-
-        lt_row[state_idx["bleeding"]] = scaled[0]
-        lt_row[state_idx["hemarthrosis"]] = scaled[1]
-        lt_row[state_idx["lt_bleeding"]] = scaled[2]
-
-    special_transitions["lt_bleeding"] = lt_row.tolist()
+    p_death = float(np.clip(case_fatality, 0.0, 1.0))
+    row = ordinary_row * (1.0 - p_death)
+    row[state_idx[HealthStates.DEATH.value]] += p_death
+    return row
 
 
 def build_transition_matrix(
     inputs: "ModelInput",
     states: list[str],
 ) -> np.ndarray:
+    """Build a weekly matrix with resolved acute-event semantics.
 
-    # Compute weekly survival probability for recovery
-    wbr = to_weekly(inputs.bleeding_rate)
-    p_no_event = np.exp(-wbr)  # P(no bleeding in one week)
+    Ordinary bleeding and hemarthrosis resolve within their observed week and
+    do not protect the next week. Those rows therefore use the same fresh
+    competing-risk draw as No Bleeding. ICH and non-ICH first apply their case
+    fatality once and then allocate survivors using that same distribution.
 
-    spont_rate = to_weekly(inputs.spontaneous_bleeding_rate)
-    joint_rate = to_weekly(inputs.joint_bleeding_rate)
-    life_rate = to_weekly(inputs.life_threatening_bleeding_rate)
-    # Background (all-cause) mortality is owned entirely by
-    # ``AgeBasedMortalityModifier``, which injects the age-specific
-    # life-table hazard every week. Keeping a non-zero constant death
-    # hazard here would double-count background mortality.
-    death_rate = 0.0
+    Background mortality is deliberately added later by
+    :class:`AgeBasedMortalityModifier` to avoid double counting.
+    """
+    required_states = {state.value for state in HealthStates}
+    missing = required_states.difference(states)
+    if missing:
+        raise ValueError(f"Transition matrix is missing required states: {missing}")
 
-    # Transition pairs
-    transition_pairs = {
-        # HEALTHY - competing risks (all rates)
-        ("healthy", "bleeding"): (spont_rate, "weekly"),
-        ("healthy", "hemarthrosis"): (joint_rate, "weekly"),
-        ("healthy", "lt_bleeding"): (life_rate, "weekly"),
-        ("healthy", "death"): (death_rate, "weekly"),
-        # BLEEDING
-        ("bleeding", "healthy"): (p_no_event, None),  # Direct probability
-        ("bleeding", "hemarthrosis"): (joint_rate, "weekly"),
-        ("bleeding", "lt_bleeding"): (life_rate, "weekly"),
-        ("bleeding", "death"): (death_rate, "weekly"),
-        # HEMARTHROSIS
-        ("hemarthrosis", "healthy"): (p_no_event, None),  # Direct probability
-        ("hemarthrosis", "bleeding"): (
-            to_weekly(inputs.spontaneous_bleeding_rate),
-            "weekly",
-        ),
-        ("hemarthrosis", "lt_bleeding"): (
-            to_weekly(inputs.life_threatening_bleeding_rate),
-            "weekly",
-        ),
-        ("hemarthrosis", "death"): (death_rate, "weekly"),
-        # LT_BLEEDING & DEATH (SPECIAL TRANSITIONS)
-    }
+    state_idx = {state: i for i, state in enumerate(states)}
+    matrix = np.zeros((len(states), len(states)), dtype=float)
+    ordinary_row = _weekly_event_distribution(inputs, states)
 
-    special_transitions = {}
+    for state in (
+        HealthStates.NO_BLEEDING.value,
+        HealthStates.BLEEDING.value,
+        HealthStates.HEMARTHROSIS.value,
+    ):
+        matrix[state_idx[state]] = ordinary_row
 
-    _add_ltb_transitions(
-        states,
-        special_transitions,
-        1.0,
-        p_no_event,
-        spont_rate,
-        joint_rate,
-        life_rate,
-        inputs.ltb_case_fatality,
+    matrix[state_idx[HealthStates.INTRACRANIAL_HEMORRHAGE.value]] = (
+        _with_case_fatality(ordinary_row, inputs.ich_case_fatality, states)
     )
-    _add_death_transitions(
-        states,
-        special_transitions,
-        1.0,
-        p_no_event,
-        spont_rate,
-        joint_rate,
-        life_rate,
-        inputs.ltb_case_fatality,
+    matrix[state_idx[HealthStates.NON_ICH_MAJOR_BLEEDING.value]] = (
+        _with_case_fatality(ordinary_row, inputs.non_ich_case_fatality, states)
     )
-
-    # Build using your original TransitionGenerator
-    builder = HybridTransitionGenerator(
-        states=states,
-        transition_pairs=transition_pairs,
-        special_transitions=special_transitions,
-        time_step="weekly",
-    )
-    matrix = builder.build_matrix()
+    matrix[
+        state_idx[HealthStates.DEATH.value],
+        state_idx[HealthStates.DEATH.value],
+    ] = 1.0
 
     # Quick sanity check
     row_sums = matrix.sum(axis=1)

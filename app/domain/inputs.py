@@ -11,8 +11,10 @@ class ModelInput:
     bleeding_rate: float
     spontaneous_bleeding_rate: float  # computed property
     joint_bleeding_rate: float
-    life_threatening_bleeding_rate: float
-    ltb_case_fatality: float  # conditional death prob. per LTB episode
+    intracranial_hemorrhage_rate: float
+    non_ich_major_bleeding_rate: float
+    ich_case_fatality: float
+    non_ich_case_fatality: float
 
     # Demographics
     baseline_age: float
@@ -26,7 +28,8 @@ class ModelInput:
     severe_arthropathy_utility: float
     spontaneous_bleeding_utility: float
     joint_bleeding_utility: float
-    life_threatening_bleeding_utility: float
+    intracranial_hemorrhage_utility: float
+    non_ich_major_bleeding_utility: float
     death_utility: float
 
     # Costs
@@ -36,4 +39,5 @@ class ModelInput:
     prophylaxis_background_factor_consumption_per_kg: float
     factor_consumption_per_spontaneous_bleeding_per_kg: float
     factor_consumption_per_joint_bleeding_per_kg: float
-    factor_consumption_per_life_threatening_bleeding_per_kg: float
+    factor_consumption_per_intracranial_hemorrhage_per_kg: float
+    factor_consumption_per_non_ich_major_bleeding_per_kg: float

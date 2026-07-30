@@ -43,6 +43,8 @@ class MortalityFile(BaseModel):
 
     model_config = ConfigDict(extra="allow")
 
+    description: str | None = None
+    reference: str | list[str] | None = None
     use_age_specific: bool
     crude_annual_rate: float | None = Field(
         default=None,

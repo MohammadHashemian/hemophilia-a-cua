@@ -1,8 +1,9 @@
+from collections.abc import Mapping
 from dataclasses import Field
 
 import numpy as np
 
-from app.analysis.distributions import Constant
+from app.analysis.distributions import Distribution
 from app.analysis.psa.models import ParameterSet
 from app.analysis.psa.parameters import Parameter
 from app.domain.scenario import Scenario
@@ -122,7 +123,7 @@ def extend_scenario(
 
 def define_scenario_extension(
     scenarios: list[Scenario],
-    extensions: dict[str, dict[str, Constant]],
+    extensions: Mapping[str, Mapping[str, Distribution]],
 ) -> list[Scenario]:
     extended_scenarios = []
 

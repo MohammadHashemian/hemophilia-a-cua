@@ -86,6 +86,19 @@ class BetaFromMeanSD(BaseModel):
         return self.mean
 
 
+class BetaDist(BaseModel):
+    """Beta distribution parameterized directly by evidence counts."""
+
+    alpha: float = Field(..., gt=0)
+    beta: float = Field(..., gt=0)
+
+    def sample(self, n: int, rng: np.random.Generator):
+        return rng.beta(self.alpha, self.beta, size=n)
+
+    def point(self) -> float:
+        return self.alpha / (self.alpha + self.beta)
+
+
 class TriangularDist(BaseModel):
     left: float
     mode: float

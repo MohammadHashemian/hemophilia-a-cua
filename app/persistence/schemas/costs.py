@@ -1,28 +1,32 @@
 
-from pydantic import BaseModel
+from app.persistence.schemas.metadata import InputMetadata
 
 
-class Currency(BaseModel):
+class Currency(InputMetadata):
     name: str
     code: str
     symbol: str
 
 
-class Assumption(BaseModel):
+class Assumption(InputMetadata):
     iu_per_microgram: float
 
 
-class Pricing(BaseModel):
+class Pricing(InputMetadata):
+    per_unit_description: str | None = None
+    per_unit_reference: str | list[str] | None = None
     per_unit: dict[str, float]  # IRR, T, USD
+    per_microgram_description: str | None = None
+    per_microgram_reference: str | list[str] | None = None
     per_microgram: dict[str, float]  # IRR, T, USD
 
 
-class CostItem(BaseModel):
+class CostItem(InputMetadata):
     item: str
     assumption: Assumption
     pricing: Pricing
 
 
-class CostFile(BaseModel):
+class CostFile(InputMetadata):
     currencies: list[Currency]
     costs: list[CostItem]

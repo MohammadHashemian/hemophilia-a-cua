@@ -1,27 +1,62 @@
 {
+  "description": "Clinical and epidemiological inputs used by the simulation. Numerical values are unchanged; metadata records their provenance or assumption status.",
+  "reference": "See each input group's reference and the source/doi fields on individual ABR estimates.",
   "epidemiology": {
+    "description": "Bleeding-event allocation, annual ICH incidence, and event-specific case-fatality inputs.",
+    "reference": [
+      "World Federation of Hemophilia. World Bleeding Disorders Registry 2023 Data Report. https://www1.wfh.org/publications/files/pdf-2452.pdf",
+      "Andersson NG et al. Br J Haematol. 2017. https://doi.org/10.1111/bjh.14844"
+    ],
     "event_fractions": {
+      "description": "AJBR fraction allocates total bleeds to joint bleeds. The non-ICH value is a proxy based on uncommon major anatomical bleeding sites, not a directly observed all-site probability.",
+      "reference": [
+        "AJBR fraction: existing project assumption; original source is not documented and must be verified.",
+        "Non-ICH proxy: WFH World Bleeding Disorders Registry 2023 Data Report. https://www1.wfh.org/publications/files/pdf-2452.pdf",
+        "Supporting iliopsoas evidence: WFH World Bleeding Disorders Registry 2018 Data Report. https://elearning.wfh.org/wp-content/uploads/2019/05/WBDR_2018_Data_Report_EN.pdf"
+      ],
       "ajbr_fraction": 0.75,
-      "ltb_fraction": 0.025
+      "non_ich_major_bleeding_fraction": 0.007455
     },
     "event_rates": {
-      "ltb_rate": {
-        "on_demand": 0.0074,
-        "prophylaxis": 0.0074
+      "description": "Annual ICH incidence rates by treatment regime; the model converts these rates to cycle probabilities.",
+      "reference": "Andersson NG et al. Br J Haematol. 2017. https://doi.org/10.1111/bjh.14844",
+      "intracranial_hemorrhage_rate": {
+        "description": "Central annual ICH-rate inputs. Verify the final numerator and person-time extraction when locking the calibration.",
+        "reference": [
+          "Andersson NG et al. Br J Haematol. 2017. https://doi.org/10.1111/bjh.14844",
+          "Andersson NG et al. Haematologica. 2025. https://doi.org/10.3324/haematol.2024.286909"
+        ],
+        "on_demand": 0.010,
+        "prophylaxis": 0.00033
       }
     },
-    "ltb_case_fatality": 0.35
+    "ich_case_fatality_description": "Death conditional on ICH. The central value is approximately consistent with 2 deaths among 24 reported ICH events; uncertainty should be sampled in PSA.",
+    "ich_case_fatality_reference": "Andersson NG et al. Br J Haematol. 2017. https://doi.org/10.1111/bjh.14844",
+    "ich_case_fatality": 0.10,
+    "non_ich_case_fatality_description": "Structural base-case assumption of no immediate fatality from the aggregated non-ICH major-bleeding proxy; this is not a published estimate.",
+    "non_ich_case_fatality_reference": "Modeling assumption caused by insufficient subtype-specific evidence; vary in sensitivity analysis.",
+    "non_ich_case_fatality": 0.0
   },
   "utilities": {
+    "description": "Treatment-regime-specific utility decrements retained from the existing model.",
+    "reference": "Existing project assumption; primary published source and time-unit derivation require verification.",
     "decrements": {
+      "description": "Utility decrement by treatment regime, interpreted using the time unit implemented in the calculation code.",
+      "reference": "Existing project calibration; source is not documented in the repository.",
       "on_demand": 0.0003725,
       "prophylaxis": 0.0018
     }
   },
   "clinical_scoring": {
+    "description": "Rules translating accumulated joint bleeding into Pettersson-score severity.",
+    "reference": "Existing project calibration; validate against the intended Pettersson-score mapping study.",
     "pettersson_score": {
+      "description": "Conversion factor and cut-points used to classify arthropathy severity.",
+      "reference": "Existing project calibration; primary source is not documented.",
       "conversion_factor": 12.6,
       "thresholds": {
+        "description": "Pettersson-score thresholds for severity categories and the scale maximum.",
+        "reference": "Existing project thresholds; original reference requires verification.",
         "mild": 4,
         "moderate": 27,
         "max": 79
@@ -29,16 +64,28 @@
     }
   },
   "treatment": {
+    "description": "Factor VIII dosing assumptions for prophylaxis and treatment of bleeding events.",
+    "reference": "Srivastava A et al. WFH Guidelines for the Management of Hemophilia, 3rd edition. https://doi.org/10.1111/hae.14046",
     "dosing": {
+      "description": "Weekly prophylaxis and per-event doses in international units. ICH and aggregated non-ICH currently share a placeholder dose; test subtype-specific resource use in sensitivity analysis.",
+      "reference": [
+        "Srivastava A et al. Haemophilia. 2020. https://doi.org/10.1111/hae.14046",
+        "Existing project dosing assumptions; regimen-specific derivation needs local clinical validation."
+      ],
       "ir_prophylaxis_weekly_dose_ui": 50,
       "standard_prophylaxis_weekly_dose_ui": 75,
       "bleeding_dose_ui": 120,
       "joint_bleeding_dose_ui": 60,
-      "lt_bleeding_dose_ui": 550
+      "intracranial_hemorrhage_dose_ui": 550,
+      "non_ich_major_bleeding_dose_ui": 550
     }
   },
   "evidence": {
+    "description": "Published ABR evidence used to parameterize treatment-regime distributions.",
+    "reference": "Each study estimate records its row-level source and DOI.",
     "abr": {
+      "description": "Study-level ABR mean, dispersion, and sample-size inputs separated by treatment regime.",
+      "reference": "The source and doi fields on every estimate are its direct bibliographic reference.",
       "on_demand": [
         {
           "mean": 30.5,

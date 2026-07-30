@@ -1,15 +1,22 @@
 {
+  "description": "Health-state utility and event-disutility inputs used to calculate QALYs.",
+  "reference": "Existing project utility set; values require confirmation against the intended published elicitation studies before final thesis reporting.",
   "state_utilities": {
+    "description": "Utility weights for mutually exclusive model states, where 1 is full health and 0 is death.",
+    "reference": "Existing model calibration. The repository does not currently document a primary publication for these exact weights; treat them as assumptions until verified.",
     "healthy": 0.915,
     "mild_arthropathy": 0.85,
     "moderate_arthropathy": 0.78,
     "severe_arthropathy": 0.68,
     "bleeding": 0.6,
     "hemarthrosis": 0.5,
-    "lt_bleeding": 0.25,
+    "intracranial_hemorrhage": 0.25,
+    "non_ich_major_bleeding": 0.25,
     "death": 0.0
   },
   "event_disutilities": {
+    "description": "Temporary decrement applied when bleeding occurs in severe arthropathy, according to the model's event-duration convention.",
+    "reference": "Existing project assumption; source and duration interpretation require verification.",
     "severe_arthropathy_bleeding": 0.1
   }
 }
