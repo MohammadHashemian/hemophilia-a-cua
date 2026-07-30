@@ -41,3 +41,8 @@ class ModelInput:
     factor_consumption_per_joint_bleeding_per_kg: float
     factor_consumption_per_intracranial_hemorrhage_per_kg: float
     factor_consumption_per_non_ich_major_bleeding_per_kg: float
+
+    # Added after the original API fields to preserve construction by older
+    # callers; production inputs always populate both from utilities.json.
+    advanced_arthropathy_utility: float | None = None
+    end_stage_arthropathy_utility: float | None = None

@@ -1,5 +1,6 @@
 from collections.abc import Callable
 from dataclasses import dataclass
+from types import SimpleNamespace
 
 import numpy as np
 
@@ -26,15 +27,12 @@ from app.domain.transition_builder import (
     build_transition_matrix,
 )
 from app.persistence.context import ModelContext
-from app.persistence.schemas.utilities import StateUtilities
 from engine.chains import Chain, MarkovChains
 from engine.vectorized import BatchMarkovChain, BatchResult
 from utils.math import cal_base_body_weight
 
 
-def setup_rewards(
-    markov: MarkovChains, inputs: ModelInput, regime: Regime, factor: float
-):
+def setup_rewards(markov: MarkovChains, inputs: ModelInput, regime: Regime, factor: float):
     """_summary_
 
     Args:
@@ -105,25 +103,33 @@ def _init_worker(inputs: ModelInput, context: ModelContext):
     ctx = context
     inp = inputs
 
-    utils = StateUtilities(
+    utils = SimpleNamespace(
         healthy=inp.healthy_utility,
+        mild_arthropathy=inp.mild_arthropathy_utility,
+        moderate_arthropathy=inp.moderate_arthropathy_utility,
+        severe_arthropathy=inp.severe_arthropathy_utility,
+        advanced_arthropathy=(
+            inp.advanced_arthropathy_utility
+            if inp.advanced_arthropathy_utility is not None
+            else ctx.utilities.state_utilities.advanced_arthropathy.mean
+        ),
+        end_stage_arthropathy=(
+            inp.end_stage_arthropathy_utility
+            if inp.end_stage_arthropathy_utility is not None
+            else ctx.utilities.state_utilities.end_stage_arthropathy.mean
+        ),
         bleeding=inp.spontaneous_bleeding_utility,
         hemarthrosis=inp.joint_bleeding_utility,
         intracranial_hemorrhage=inp.intracranial_hemorrhage_utility,
         non_ich_major_bleeding=inp.non_ich_major_bleeding_utility,
         death=inp.death_utility,
-        mild_arthropathy=inp.mild_arthropathy_utility,
-        moderate_arthropathy=inp.moderate_arthropathy_utility,
-        severe_arthropathy=inp.severe_arthropathy_utility,
     )
 
     _reward_constants = {
         "lam_bleed": inp.spontaneous_bleeding_rate / 52,
         "lam_joint": inp.joint_bleeding_rate / 52,
         "weekly_discount": (
-            (1 + inp.benefits_discount_rate) ** (1 / 52) - 1
-            if inp.benefits_discount_rate
-            else 0
+            (1 + inp.benefits_discount_rate) ** (1 / 52) - 1 if inp.benefits_discount_rate else 0
         ),
         # Coerce to int so the scalar ``weight`` reward (which calls
         # ``cal_body_weight``) is not poisoned by the float annotation on
@@ -132,9 +138,7 @@ def _init_worker(inputs: ModelInput, context: ModelContext):
         "baseline_age_weeks": int(inp.baseline_age * 52),
         # flatten deep structures
         "utilities": utils,
-        "threshold_mild": ctx.clinical.clinical_scoring.pettersson_score.thresholds.mild,
-        "threshold_moderate": ctx.clinical.clinical_scoring.pettersson_score.thresholds.moderate,
-        "threshold_max": ctx.clinical.clinical_scoring.pettersson_score.thresholds.max,
+        "utility_thresholds": ctx.utilities.pettersson_utility_thresholds,
         "conversion_factor": ctx.clinical.clinical_scoring.pettersson_score.conversion_factor,
     }
 
@@ -217,21 +221,17 @@ def worker_function(
 # =============================================================================
 
 
-def _build_shared_per_iter(inputs: list[ModelInput], states: list[str]) -> dict:
+def _build_shared_per_iter(
+    inputs: list[ModelInput], states: list[str], context: ModelContext
+) -> dict:
     """Stack per-iter constants into (n_iters,) arrays for vectorized reward funcs."""
     per_iter: dict[str, np.ndarray] = {
         "lam_bleed": np.array(
             [inp.spontaneous_bleeding_rate / 52 for inp in inputs], dtype=np.float64
         ),
-        "lam_joint": np.array(
-            [inp.joint_bleeding_rate / 52 for inp in inputs], dtype=np.float64
-        ),
-        "weight_factor": np.array(
-            [inp.weight_factor for inp in inputs], dtype=np.float64
-        ),
-        "healthy_utility": np.array(
-            [inp.healthy_utility for inp in inputs], dtype=np.float64
-        ),
+        "lam_joint": np.array([inp.joint_bleeding_rate / 52 for inp in inputs], dtype=np.float64),
+        "weight_factor": np.array([inp.weight_factor for inp in inputs], dtype=np.float64),
+        "healthy_utility": np.array([inp.healthy_utility for inp in inputs], dtype=np.float64),
         "mild_arthropathy_utility": np.array(
             [inp.mild_arthropathy_utility for inp in inputs], dtype=np.float64
         ),
@@ -240,6 +240,24 @@ def _build_shared_per_iter(inputs: list[ModelInput], states: list[str]) -> dict:
         ),
         "severe_arthropathy_utility": np.array(
             [inp.severe_arthropathy_utility for inp in inputs], dtype=np.float64
+        ),
+        "advanced_arthropathy_utility": np.array(
+            [
+                inp.advanced_arthropathy_utility
+                if inp.advanced_arthropathy_utility is not None
+                else context.utilities.state_utilities.advanced_arthropathy.mean
+                for inp in inputs
+            ],
+            dtype=np.float64,
+        ),
+        "end_stage_arthropathy_utility": np.array(
+            [
+                inp.end_stage_arthropathy_utility
+                if inp.end_stage_arthropathy_utility is not None
+                else context.utilities.state_utilities.end_stage_arthropathy.mean
+                for inp in inputs
+            ],
+            dtype=np.float64,
         ),
         "spontaneous_bleeding_utility": np.array(
             [inp.spontaneous_bleeding_utility for inp in inputs], dtype=np.float64
@@ -253,21 +271,13 @@ def _build_shared_per_iter(inputs: list[ModelInput], states: list[str]) -> dict:
         "non_ich_major_bleeding_utility": np.array(
             [inp.non_ich_major_bleeding_utility for inp in inputs], dtype=np.float64
         ),
-        "death_utility": np.array(
-            [inp.death_utility for inp in inputs], dtype=np.float64
-        ),
+        "death_utility": np.array([inp.death_utility for inp in inputs], dtype=np.float64),
         "prophylaxis_background_factor_consumption_per_kg": np.array(
-            [
-                inp.prophylaxis_background_factor_consumption_per_kg
-                for inp in inputs
-            ],
+            [inp.prophylaxis_background_factor_consumption_per_kg for inp in inputs],
             dtype=np.float64,
         ),
         "factor_consumption_per_spontaneous_bleeding_per_kg": np.array(
-            [
-                inp.factor_consumption_per_spontaneous_bleeding_per_kg
-                for inp in inputs
-            ],
+            [inp.factor_consumption_per_spontaneous_bleeding_per_kg for inp in inputs],
             dtype=np.float64,
         ),
         "factor_consumption_per_joint_bleeding_per_kg": np.array(
@@ -286,9 +296,7 @@ def _build_shared_per_iter(inputs: list[ModelInput], states: list[str]) -> dict:
     return per_iter
 
 
-def _build_all_matrices(
-    inputs: list[ModelInput], states: list[str]
-) -> np.ndarray:
+def _build_all_matrices(inputs: list[ModelInput], states: list[str]) -> np.ndarray:
     """Build every PSA transition matrix in one broadcast operation."""
     return build_transition_matrices(inputs, states)
 
@@ -374,7 +382,7 @@ def worker_function_batch(
     )
 
     # 3. Build per-iter constants
-    per_iter = _build_shared_per_iter(inputs, states)
+    per_iter = _build_shared_per_iter(inputs, states, context)
     steps = int(inputs[0].cycle)
     weekly_discount = (
         (1 + inputs[0].benefits_discount_rate) ** (1 / 52) - 1
@@ -382,22 +390,23 @@ def worker_function_batch(
         else 0.0
     )
 
+    utility_thresholds = context.utilities.pettersson_utility_thresholds
     shared_kwargs: dict = {
         "regime": scenario.regime,
         "per_iter": per_iter,
-        "thresholds": {
-            "mild": context.clinical.clinical_scoring.pettersson_score.thresholds.mild,
-            "moderate": context.clinical.clinical_scoring.pettersson_score.thresholds.moderate,
-            "max": context.clinical.clinical_scoring.pettersson_score.thresholds.max,
+        "utility_thresholds": {
+            "early_arthropathy": utility_thresholds.early_arthropathy,
+            "moderate_arthropathy": utility_thresholds.moderate_arthropathy,
+            "severe_arthropathy": utility_thresholds.severe_arthropathy,
+            "advanced_arthropathy": utility_thresholds.advanced_arthropathy,
+            "end_stage_arthropathy": utility_thresholds.end_stage_arthropathy,
         },
         "conversion_factor": context.clinical.clinical_scoring.pettersson_score.conversion_factor,
         "weekly_discount": weekly_discount,
         "baseline_age_weeks": float(inputs[0].baseline_age) * 52,
         "base_weight_by_step": np.array(
             [
-                cal_base_body_weight(
-                    int(float(inputs[0].baseline_age) * 52) + step
-                )
+                cal_base_body_weight(int(float(inputs[0].baseline_age) * 52) + step)
                 for step in range(steps + 1)
             ],
             dtype=np.float64,
@@ -405,9 +414,7 @@ def worker_function_batch(
     }
 
     # 4. Run vectorized walk
-    rng = np.random.default_rng(
-        context.simulation.environment.seed + worker_id
-    )
+    rng = np.random.default_rng(context.simulation.environment.seed + worker_id)
     entrance_idx = states.index("healthy") if "healthy" in states else 0
     batch_result = batch_chain.walk_batch(
         steps=steps,

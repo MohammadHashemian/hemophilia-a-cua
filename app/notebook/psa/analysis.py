@@ -7,6 +7,7 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import numpy as np
 import polars as pl
+from matplotlib.ticker import MaxNLocator, PercentFormatter
 
 from app.notebook.psa.scenarios import HorizonSpec, get_horizon
 from app.notebook.psa.workflow import load_horizon_results
@@ -125,9 +126,7 @@ def incremental_results(
                     else np.nan
                 ),
                 "delta_nmb": paired["delta_nmb"].mean(),
-                "probability_cost_effective": (
-                    paired["delta_nmb"] > 0
-                ).mean(),
+                "probability_cost_effective": (paired["delta_nmb"] > 0).mean(),
             }
         )
     return pl.DataFrame(rows)
@@ -173,27 +172,69 @@ def plot_cost_effectiveness_plane(
 def plot_survival(
     df: pl.DataFrame,
     horizon: str | HorizonSpec,
-) -> tuple[plt.Figure, plt.Axes]:
+) -> tuple[plt.Figure, plt.Axes]:  # type: ignore
     spec = get_horizon(horizon)
     fig, ax = plt.subplots(figsize=(10, 6))
+    curves: list[np.ndarray] = []
+    styles = {
+        "on-demand": {"color": "#D55E00", "linestyle": "-", "marker": "o"},
+        "prophylaxis": {"color": "#0072B2", "linestyle": "--", "marker": "s"},
+    }
     for regime in sorted(df["regime"].unique().to_list()):
         sub = base_results(df).filter(pl.col("regime") == regime)
         horizon_weeks = int(sub["cycles"].max())
-        survival = [
-            (
+        survival = np.array(
+            [
                 ((~sub["is_absorbed"]) | (sub["observed_cycles"] > week)).sum()
                 / sub.height
-            )
-            for week in range(horizon_weeks + 1)
-        ]
+                for week in range(horizon_weeks + 1)
+            ],
+            dtype=float,
+        )
+        curves.append(survival)
         ages = spec.start_age + np.arange(horizon_weeks + 1) / 52
-        ax.plot(ages, survival, linewidth=2, label=f"{regime} (n={sub.height})")
+        style = styles.get(regime, {})
+        ax.plot(
+            ages,
+            survival,
+            linewidth=2.2,
+            drawstyle="steps-post",
+            color=style.get("color"),
+            linestyle=style.get("linestyle", "-"),
+            marker=style.get("marker"),
+            markevery=52,
+            markersize=4,
+            label=(
+                f"{regime} — final survival " f"{survival[-1]:.2%} (n={sub.height})"
+            ),
+        )
+
+    minimum_survival = min(float(curve.min()) for curve in curves)
+    if spec.key == "childhood" and minimum_survival >= 0.90:
+        observed_loss = 1.0 - minimum_survival
+        padding = max(0.002, observed_loss * 0.20)
+        ax.set_ylim(max(0.0, minimum_survival - padding), 1.001)
+        ax.yaxis.set_major_locator(MaxNLocator(nbins=7))
+        ax.yaxis.set_major_formatter(PercentFormatter(1.0, decimals=1))
+        ax.text(
+            0.01,
+            0.02,
+            "Zoomed vertical axis (does not start at 0)",
+            transform=ax.transAxes,
+            fontsize=9,
+            alpha=0.75,
+        )
+        ylabel = "Proportion alive (zoomed)"
+    else:
+        ax.set_ylim(0, 1.01)
+        ax.yaxis.set_major_formatter(PercentFormatter(1.0))
+        ylabel = "Proportion alive"
+
     ax.set(
         title=f"Survival — {spec.label}",
         xlabel="Age (years)",
-        ylabel="Proportion alive",
+        ylabel=ylabel,
         xlim=(spec.start_age, spec.end_age),
-        ylim=(0, 1.01),
     )
     ax.grid(True, linestyle="--", alpha=0.5)
     ax.legend()

@@ -48,15 +48,26 @@
     }
   },
   "clinical_scoring": {
-    "description": "Rules translating accumulated joint bleeding into Pettersson-score severity.",
-    "reference": "Existing project calibration; validate against the intended Pettersson-score mapping study.",
+    "description": "Rules translating accumulated treated joint bleeding into Pettersson-score progression and severity. The model adds one Pettersson point per 12.6 hemarthrosis events.",
+    "reference": [
+      "Zhou ZY, Raimundo K, Patel AM, et al. Model of Short- and Long-Term Outcomes of Emicizumab Prophylaxis Treatment for Persons with Hemophilia A. J Manag Care Spec Pharm. 2020;26(9):1109-1120. https://doi.org/10.18553/jmcp.2020.19406",
+      "Fischer K, van Hout BA, van der Bom JG, et al. Association between joint bleeds and Pettersson scores in severe haemophilia. Acta Radiol. 2002;43(5):528-532. https://doi.org/10.1034/j.1600-0455.2002.430514.x",
+      "Pettersson H, Ahlberg A, Nilsson IM. A radiologic classification of hemophilic arthropathy. Clin Orthop Relat Res. 1980;(149):153-159. PMID: 7408294."
+    ],
     "pettersson_score": {
-      "description": "Conversion factor and cut-points used to classify arthropathy severity.",
-      "reference": "Existing project calibration; primary source is not documented.",
+      "description": "Conversion factor and cut-points used to represent cumulative radiographic joint damage. The 12.6 conversion is adopted directly from Zhou et al.; Fischer et al. independently reported approximately one Pettersson point per 13 joint bleeds.",
+      "reference": [
+        "Direct source for conversion_factor 12.6: Zhou ZY et al. J Manag Care Spec Pharm. 2020;26(9):1109-1120. https://doi.org/10.18553/jmcp.2020.19406",
+        "Supporting empirical evidence (approximately 13 joint bleeds per Pettersson point; 295 radiographs from 117 patients): Fischer K et al. Acta Radiol. 2002;43(5):528-532. https://doi.org/10.1034/j.1600-0455.2002.430514.x"
+      ],
       "conversion_factor": 12.6,
       "thresholds": {
-        "description": "Pettersson-score thresholds for severity categories and the scale maximum.",
-        "reference": "Existing project thresholds; original reference requires verification.",
+        "description": "Legacy Pettersson-score cut-points used by the model's three-band severity helper, plus its numerical cap. Utility assignment uses the more detailed evidence-defined bands in utilities.json.",
+        "reference": [
+          "Zhou ZY et al. 2020 used Pettersson score >=1 for arthropathy, >=28 for orthopedic surgery, and score ranges 0-4, 5-27, and 28-78 for cost categories. https://doi.org/10.18553/jmcp.2020.19406",
+          "The original per-joint radiographic classification was defined by Pettersson H, Ahlberg A, and Nilsson IM. Clin Orthop Relat Res. 1980;(149):153-159. PMID: 7408294.",
+          "The stored maximum of 79 is an implementation cap; the published six-joint Pettersson scale has a maximum of 78."
+        ],
         "mild": 4,
         "moderate": 27,
         "max": 79

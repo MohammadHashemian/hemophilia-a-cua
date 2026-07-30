@@ -190,9 +190,7 @@ def reward_consumption(step, state_idx, store_arrays, shared_kwargs, rng):
 
     dose = dose + np.where(
         in_bleeding & ~in_death,
-        weight
-        * per_iter["factor_consumption_per_spontaneous_bleeding_per_kg"]
-        * event_count,
+        weight * per_iter["factor_consumption_per_spontaneous_bleeding_per_kg"] * event_count,
         0.0,
     )
     dose = dose + np.where(
@@ -216,29 +214,38 @@ def reward_consumption(step, state_idx, store_arrays, shared_kwargs, rng):
 def reward_utility(step, state_idx, store_arrays, shared_kwargs, rng):
     """Per-iter weekly QALY at the current step (with discounting)."""
     per_iter = shared_kwargs["per_iter"]
-    thresholds = shared_kwargs["thresholds"]
+    thresholds = shared_kwargs["utility_thresholds"]
     weekly_discount = shared_kwargs["weekly_discount"]
     pettersson_score = store_arrays.get("pettersson_score")
     if pettersson_score is None:
         pettersson_score = np.zeros(state_idx.shape, dtype=np.float64)
 
-    # Arth severity utility
-    mild_thr = thresholds["mild"]
-    moderate_thr = thresholds["moderate"]
-    max_thr = thresholds["max"]
-
     util_mild = per_iter["mild_arthropathy_utility"]
     util_moderate = per_iter["moderate_arthropathy_utility"]
     util_severe = per_iter["severe_arthropathy_utility"]
+    util_advanced = per_iter["advanced_arthropathy_utility"]
+    util_end_stage = per_iter["end_stage_arthropathy_utility"]
     util_healthy = per_iter["healthy_utility"]
 
     arth = np.where(
-        pettersson_score < mild_thr,
+        pettersson_score < thresholds["early_arthropathy"],
         util_healthy,
         np.where(
-            pettersson_score < moderate_thr,
+            pettersson_score < thresholds["moderate_arthropathy"],
             util_mild,
-            np.where(pettersson_score < max_thr, util_moderate, util_severe),
+            np.where(
+                pettersson_score < thresholds["severe_arthropathy"],
+                util_moderate,
+                np.where(
+                    pettersson_score < thresholds["advanced_arthropathy"],
+                    util_severe,
+                    np.where(
+                        pettersson_score < thresholds["end_stage_arthropathy"],
+                        util_advanced,
+                        util_end_stage,
+                    ),
+                ),
+            ),
         ),
     )
 

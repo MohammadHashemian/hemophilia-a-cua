@@ -53,6 +53,12 @@ def test_utilities_data():
 
     # 1. Type check
     assert isinstance(result, UtilityFile)
+    utilities = result.state_utilities
+    assert utilities.healthy.mean == 0.94
+    assert utilities.intracranial_hemorrhage.mean == 0.15
+    assert utilities.non_ich_major_bleeding.mean == 0.55
+    assert utilities.mild_arthropathy.uncertainty.sd == 0.13
+    assert result.pettersson_utility_thresholds.end_stage_arthropathy == 40
 
 
 def test_simulation_data():

@@ -122,6 +122,7 @@ def _run_batch(
     identity_chain: Chain,
     batch_worker_function: Callable,
     max_parallel_scenarios: int,
+    random_stream_keys: dict[str, str] | None = None,
 ) -> list[SimulationResult]:
     """Run each scenario in the batch via the vectorized batch worker.
 
@@ -162,10 +163,12 @@ def _run_batch(
         scenario = bundle.scenario
         inputs = bundle.inputs
         scenario_name = getattr(scenario, "name", str(scenario))
-        worker_id = stable_hash(
-            context.simulation.environment.seed,
-            scenario_name,
+        stream_key = (
+            random_stream_keys.get(scenario_name, scenario_name)
+            if random_stream_keys is not None
+            else scenario_name
         )
+        worker_id = stable_hash(context.simulation.environment.seed, stream_key)
         n_iters = len(inputs)
         steps = int(inputs[0].cycle)
         n_years = max(steps // 52, 1)
@@ -359,6 +362,7 @@ def run_scenarios_in_batches(
     batch_worker_function: Callable | None = None,
     scenario_fingerprints: dict[str, str] | None = None,
     max_parallel_scenarios: int = 2,
+    random_stream_keys: dict[str, str] | None = None,
 ):
     """Run scenario bundles in batches, write per-pair Parquet files, and free memory after each batch.
 
@@ -487,6 +491,7 @@ def run_scenarios_in_batches(
                     identity_chain=identity_chain,
                     batch_worker_function=batch_worker_function or worker_function,
                     max_parallel_scenarios=max_parallel_scenarios,
+                    random_stream_keys=random_stream_keys,
                 )
                 simulation_seconds += time.perf_counter() - phase_started
             else:

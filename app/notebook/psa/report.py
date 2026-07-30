@@ -9,6 +9,10 @@ import matplotlib.pyplot as plt
 import polars as pl
 
 from app.notebook.psa.analysis import output_dirs, prepare_results
+from app.notebook.psa.interpretation import (
+    figure_interpretation,
+    table_interpretation,
+)
 from app.notebook.psa.presentation import TableSection, table_sections
 from app.notebook.psa.report_plots import all_figures
 from app.notebook.psa.scenarios import HorizonSpec, get_horizon
@@ -48,17 +52,38 @@ class PSAReport:
     def tables(self) -> dict[str, pl.DataFrame]:
         return all_tables(self.df, wtp=self.wtp)
 
-    def table_sections(self) -> list[TableSection]:
+    def table_sections(
+        self,
+        *,
+        tables: dict[str, pl.DataFrame] | None = None,
+    ) -> list[TableSection]:
         """Return narrow presentation views without recalculating results."""
 
-        return table_sections(self.tables())
+        return table_sections(self.tables() if tables is None else tables)
 
-    def figures(self) -> dict[str, plt.Figure]:
+    def interpret_table(self, section: TableSection) -> str:
+        return table_interpretation(section, wtp=self.wtp)
+
+    def interpret_figure(
+        self,
+        name: str,
+        *,
+        tables: dict[str, pl.DataFrame] | None = None,
+    ) -> str:
+        calculated = self.tables() if tables is None else tables
+        return figure_interpretation(
+            name,
+            df=self.df,
+            tables=calculated,
+            wtp=self.wtp,
+        )
+
+    def figures(self) -> dict[str, plt.Figure]:  # type: ignore
         return all_figures(self.df, self.horizon, wtp=self.wtp)
 
     def save_figures(
         self,
-        figures: dict[str, plt.Figure],
+        figures: dict[str, plt.Figure],  # type: ignore
         *,
         dpi: int = 300,
     ) -> dict[str, Path]:

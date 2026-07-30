@@ -28,6 +28,8 @@ class ParameterSet:
     mild_arthropathy_utility: Parameter
     moderate_arthropathy_utility: Parameter
     severe_arthropathy_utility: Parameter
+    advanced_arthropathy_utility: Parameter
+    end_stage_arthropathy_utility: Parameter
     spontaneous_bleeding_utility: Parameter
     joint_bleeding_utility: Parameter
     intracranial_hemorrhage_utility: Parameter

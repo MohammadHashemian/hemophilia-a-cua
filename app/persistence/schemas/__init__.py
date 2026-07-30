@@ -20,7 +20,13 @@ from app.persistence.schemas.economic_policy import EconomicPolicyFile, GDPPerCa
 from app.persistence.schemas.mortality import MortalityFile
 from app.persistence.schemas.results import HemophiliaOutput
 from app.persistence.schemas.simulation import PSA, Discounting, Environment, SimulationFile, Time
-from app.persistence.schemas.utilities import EventDisutilities, StateUtilities, UtilityFile
+from app.persistence.schemas.utilities import (
+    PetterssonUtilityThresholds,
+    StateUtilities,
+    UtilityFile,
+    UtilityUncertainty,
+    UtilityValue,
+)
 
 __all__ = [
     "EventFractions",
@@ -54,6 +60,8 @@ __all__ = [
     "Time",
     "SimulationFile",
     "StateUtilities",
-    "EventDisutilities",
+    "PetterssonUtilityThresholds",
+    "UtilityUncertainty",
+    "UtilityValue",
     "UtilityFile",
 ]

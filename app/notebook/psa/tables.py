@@ -8,7 +8,13 @@ import pandas as pd
 import polars as pl
 
 from app.notebook.calibration import build_calibration_report
-from app.notebook.psa.economics import economic_summary, scenario_pairs
+from app.notebook.psa.economics import (
+    abr_threshold_analysis,
+    ceac_threshold_summary,
+    economic_summary,
+    scenario_pairs,
+    sort_report_frame,
+)
 
 
 def mean_sd(series: pd.Series, digits: int = 2) -> str:
@@ -120,7 +126,7 @@ def resource_summary(df: pl.DataFrame) -> pl.DataFrame:
 
 
 def state_occupation(df: pl.DataFrame) -> pl.DataFrame:
-    return (
+    result = (
         df.group_by("scenario")
         .agg(
             healthy=pl.col("healthy_share").mean(),
@@ -130,9 +136,15 @@ def state_occupation(df: pl.DataFrame) -> pl.DataFrame:
             non_ich_major_bleeding=pl.col("non_ich_major_bleeding_share").mean(),
             death=pl.col("death_share").mean(),
         )
-        .with_columns(pl.all().exclude("scenario").round(3))
-        .sort("scenario")
+        .with_columns(
+            pl.sum_horizontal(pl.all().exclude("scenario")).alias("state_share_sum")
+        )
+        .with_columns(
+            (pl.col("state_share_sum") - 1).abs().alias("state_share_abs_error")
+        )
+        .with_columns(pl.all().exclude("scenario").round(6))
     )
+    return sort_report_frame(result)
 
 
 def survival_efficiency(df: pl.DataFrame) -> pl.DataFrame:
@@ -222,7 +234,8 @@ def all_tables(df: pl.DataFrame, *, wtp: float) -> dict[str, pl.DataFrame]:
     base = df.filter(pl.col("extension").is_null())
     calibration, absorption = calibration_tables(base)
     abr, factor = reduction_tables(df)
-    return {
+    _, abr_thresholds = abr_threshold_analysis(df, wtp=wtp)
+    tables = {
         "Calibration": calibration,
         "Absorption diagnostics": absorption,
         "Clinical outcomes": clinical_summary(df),
@@ -234,4 +247,9 @@ def all_tables(df: pl.DataFrame, *, wtp: float) -> dict[str, pl.DataFrame]:
         "ABR reduction": abr,
         "Factor-consumption reduction": factor,
         "ICER and NMB": economic_summary(df, wtp=wtp),
+        "ICER vs ABR threshold": abr_thresholds,
+        "CEAC decision thresholds": ceac_threshold_summary(
+            df, selected_wtp=wtp
+        ),
     }
+    return {name: sort_report_frame(frame) for name, frame in tables.items()}

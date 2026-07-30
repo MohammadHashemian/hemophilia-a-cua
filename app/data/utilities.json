@@ -1,22 +1,133 @@
 {
-  "description": "Health-state utility and event-disutility inputs used to calculate QALYs.",
-  "reference": "Existing project utility set; values require confirmation against the intended published elicitation studies before final thesis reporting.",
-  "state_utilities": {
-    "description": "Utility weights for mutually exclusive model states, where 1 is full health and 0 is death.",
-    "reference": "Existing model calibration. The repository does not currently document a primary publication for these exact weights; treat them as assumptions until verified.",
-    "healthy": 0.915,
-    "mild_arthropathy": 0.85,
-    "moderate_arthropathy": 0.78,
-    "severe_arthropathy": 0.68,
-    "bleeding": 0.6,
-    "hemarthrosis": 0.5,
-    "intracranial_hemorrhage": 0.25,
-    "non_ich_major_bleeding": 0.25,
-    "death": 0.0
+  "description": "Health-state utilities used to calculate QALYs. Chronic utility is selected by Pettersson score; an acute event temporarily uses the lower of the chronic and acute-event utilities.",
+  "reference": [
+    "ICER. Valoctocogene Roxaparvovec and Emicizumab for Hemophilia A: Effectiveness and Value. 2020.",
+    "Fischer K et al. The association of haemophilic arthropathy with health-related quality of life. Haemophilia. 2016;22(6):833-840. doi:10.1111/hae.13120.",
+    "Cohan D et al. Modeling Benefits, Costs, and Affordability of a Novel Gene Therapy in Hemophilia A. J Med Econ. 2022;25(1):182-193. doi:10.1080/13696998.2022.2033050."
+  ],
+  "pettersson_utility_thresholds": {
+    "description": "Inclusive lower bounds for the evidence-defined utility bands. PS 0 uses healthy; 1-4 early; 5-12 moderate; 13-21 severe; 22-39 advanced; and 40-79 end-stage.",
+    "reference": "Fischer et al. 2016 (doi:10.1111/hae.13120); PS 0 is separated using ICER/O'Hara evidence.",
+    "early_arthropathy": 1,
+    "moderate_arthropathy": 5,
+    "severe_arthropathy": 13,
+    "advanced_arthropathy": 22,
+    "end_stage_arthropathy": 40
   },
-  "event_disutilities": {
-    "description": "Temporary decrement applied when bleeding occurs in severe arthropathy, according to the model's event-duration convention.",
-    "reference": "Existing project assumption; source and duration interpretation require verification.",
-    "severe_arthropathy_bleeding": 0.1
+  "state_utilities": {
+    "description": "PS 0 is separated from early radiographic arthropathy so that a young, bleed-free patient on effective prophylaxis is not artificially capped at 0.82.",
+    "reference": "See the citation and interpretation stored with each utility.",
+    "healthy": {
+      "mean": 0.94,
+      "description": "No established radiographic arthropathy: Pettersson score exactly 0. Intended for the young starting cohort. Acute bleeds are applied separately.",
+      "reference": "ICER 2020, Table of health-state utilities: age 0-30 and Pettersson score 0 = 0.94, based on O'Hara et al. 2018 (doi:10.1186/s12955-018-0908-9).",
+      "uncertainty": {
+        "distribution": "triangular",
+        "low": 0.82,
+        "high": 1.0,
+        "description": "Plausible range used for PSA; 0.82 is the ICER value for young patients with PS 1-27 and 1.00 is the utility ceiling."
+      }
+    },
+    "mild_arthropathy": {
+      "mean": 0.82,
+      "description": "Early radiographic arthropathy: Pettersson score 1-4.",
+      "reference": "Fischer et al. 2016 (doi:10.1111/hae.13120), reported for PS 0-4; PS 0 is separated in this model using ICER/O'Hara evidence.",
+      "uncertainty": {
+        "distribution": "beta_from_mean_sd",
+        "sd": 0.13,
+        "description": "Published standard deviation for the PS 0-4 group."
+      }
+    },
+    "moderate_arthropathy": {
+      "mean": 0.81,
+      "description": "Pettersson score 5-12.",
+      "reference": "Fischer et al. 2016 (doi:10.1111/hae.13120), as implemented in published haemophilia economic models.",
+      "uncertainty": {
+        "distribution": "beta_from_mean_sd",
+        "sd": 0.12
+      }
+    },
+    "severe_arthropathy": {
+      "mean": 0.77,
+      "description": "Pettersson score 13-21.",
+      "reference": "Fischer et al. 2016 (doi:10.1111/hae.13120), as implemented in published haemophilia economic models.",
+      "uncertainty": {
+        "distribution": "beta_from_mean_sd",
+        "sd": 0.13
+      }
+    },
+    "advanced_arthropathy": {
+      "mean": 0.74,
+      "description": "Pettersson score 22-39.",
+      "reference": "Fischer et al. 2016 (doi:10.1111/hae.13120), as implemented in published haemophilia economic models.",
+      "uncertainty": {
+        "distribution": "beta_from_mean_sd",
+        "sd": 0.12
+      }
+    },
+    "end_stage_arthropathy": {
+      "mean": 0.72,
+      "description": "Pettersson score 40-78; score 79 is capped into this final model band.",
+      "reference": "Fischer et al. 2016 (doi:10.1111/hae.13120), as implemented in published haemophilia economic models.",
+      "uncertainty": {
+        "distribution": "beta_from_mean_sd",
+        "sd": 0.11
+      }
+    },
+    "bleeding": {
+      "mean": 0.66,
+      "description": "Temporary utility during a treated non-target-joint bleed.",
+      "reference": "Neufeld EJ et al. Effect of acute bleeding on daily quality of life assessments in patients with congenital hemophilia with inhibitors. Value Health. 2012;15(6):916-925. doi:10.1016/j.jval.2012.05.005; uncertainty bounds follow Cohan et al. 2022.",
+      "uncertainty": {
+        "distribution": "triangular",
+        "low": 0.53,
+        "high": 0.79
+      }
+    },
+    "hemarthrosis": {
+      "mean": 0.54,
+      "description": "Temporary utility during a treated target-joint bleed/hemarthrosis.",
+      "reference": "Mazza G et al. Value Health. 2016;19(7):A608. doi:10.1016/j.jval.2016.09.1420; implemented as 0.66 non-target bleed utility minus 0.12 target-joint decrement in Cohan et al. 2022.",
+      "uncertainty": {
+        "distribution": "triangular",
+        "low": 0.42,
+        "high": 0.66,
+        "description": "Symmetric plausible range around the modelled 0.54 estimate; tested because the source is a conference abstract and the value is derived."
+      }
+    },
+    "intracranial_hemorrhage": {
+      "mean": 0.15,
+      "description": "Utility for a major nonfatal intracranial hemorrhage. The current simulation applies it during the acute ICH state week only.",
+      "reference": "Hogg K et al. Preferences for treatments to prevent venous thromboembolism after total hip or knee arthroplasty. JAMA Intern Med. 2013;173(8):612-620. doi:10.1001/jamainternmed.2013.563.",
+      "uncertainty": {
+        "distribution": "triangular",
+        "low": 0.0,
+        "high": 0.65,
+        "description": "Published median 0.15 and IQR 0.00-0.65; represented approximately as a triangular PSA distribution."
+      }
+    },
+    "non_ich_major_bleeding": {
+      "mean": 0.55,
+      "description": "Temporary utility during an acute non-ICH major bleed.",
+      "reference": [
+        "Hogg K et al. JAMA Intern Med. 2013;173(8):612-620. doi:10.1001/jamainternmed.2013.563: standard-gamble utility approximately 0.65 for one week of gastrointestinal bleeding.",
+        "National Clinical Guideline Centre. Acute Upper Gastrointestinal Bleeding: Management. NICE Clinical Guideline 141, full guideline, 2012: economic analysis used utility 0.45 while hospitalized and 0.78 at home. https://www.nice.org.uk/guidance/cg141/evidence/full-guideline-pdf-186534541",
+        "Base case 0.55 is the prespecified midpoint between these two estimates."
+      ],
+      "uncertainty": {
+        "distribution": "triangular",
+        "low": 0.45,
+        "high": 0.65,
+        "description": "Evidence-bracketing triangular distribution with mode 0.55."
+      }
+    },
+    "death": {
+      "mean": 0.0,
+      "description": "Death.",
+      "reference": "Conventional QALY anchor.",
+      "uncertainty": {
+        "distribution": "constant"
+      }
+    }
   }
 }

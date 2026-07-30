@@ -53,6 +53,8 @@ class ParameterResolver:
             mild_arthropathy_utility=res["mild_arthropathy_utility"][i],
             moderate_arthropathy_utility=res["moderate_arthropathy_utility"][i],
             severe_arthropathy_utility=res["severe_arthropathy_utility"][i],
+            advanced_arthropathy_utility=res["advanced_arthropathy_utility"][i],
+            end_stage_arthropathy_utility=res["end_stage_arthropathy_utility"][i],
             spontaneous_bleeding_utility=res["spontaneous_bleeding_utility"][i],
             joint_bleeding_utility=res["joint_bleeding_utility"][i],
             intracranial_hemorrhage_utility=res[

@@ -266,7 +266,19 @@ def build_df(
 
         data.append(row)
 
-    df = pl.DataFrame(data, infer_schema_length=10000)
+    # OWSA batches can begin with one or more base scenarios (all
+    # ``extension=None``) and only encounter string extensions after more
+    # than 10,000 rows. Declare nullable types up front so inference never
+    # incorrectly locks these columns to Null before reaching later rows.
+    df = pl.DataFrame(
+        data,
+        infer_schema_length=10000,
+        schema_overrides={
+            "extension": pl.String,
+            "absorbed_at": pl.Float64,
+            "death_cause": pl.String,
+        },
+    )
 
     # Polars infers nullable columns as ``Null`` when a batch happens to
     # have only nulls in that column (e.g. ``extension`` is None for

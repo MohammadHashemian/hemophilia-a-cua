@@ -101,14 +101,9 @@ def build_bundles(
         for field in scenario_params.__dataclass_fields__:
             field_seed = stable_hash(scenario_seed, field)
             field_rng = np.random.default_rng(field_seed)
-            raw[field] = getattr(scenario_params, field).sample(
-                sample_size, field_rng
-            )
+            raw[field] = getattr(scenario_params, field).sample(sample_size, field_rng)
         resolved = ParameterResolver.resolve_samples(raw)
-        inputs = [
-            ParameterResolver.build_single(resolved, index)
-            for index in range(sample_size)
-        ]
+        inputs = [ParameterResolver.build_single(resolved, index) for index in range(sample_size)]
         bundles.append(ScenarioBundle(scenario=scenario, inputs=inputs))
     return bundles
 
@@ -122,7 +117,7 @@ def identity_chain() -> Chain:
     )
 
 
-def _simulation_code_digest(root: Path) -> str:
+def simulation_code_digest(root: Path) -> str:
     digest = hashlib.sha256()
     digest.update(_SCENARIO_CACHE_VERSION.encode())
     for relative_path in _SIMULATION_CODE_PATHS:
@@ -172,7 +167,10 @@ def scenario_cache_fingerprint(
         digest.update(field.name.encode())
     for model_input in bundle.inputs:
         for field in model_fields:
-            digest.update(struct.pack("!d", float(getattr(model_input, field.name))))
+            value = getattr(model_input, field.name)
+            # Optional fields exist only for backward-compatible construction;
+            # production resolver output always supplies JSON-derived values.
+            digest.update(b"<none>" if value is None else struct.pack("!d", float(value)))
     return digest.hexdigest()
 
 
@@ -207,7 +205,7 @@ def run_horizon(
     fingerprint_seconds = 0.0
     if resume:
         phase_started = time.perf_counter()
-        code_digest = _simulation_code_digest(root)
+        code_digest = simulation_code_digest(root)
         scenario_fingerprints = {
             bundle.scenario.name: scenario_cache_fingerprint(
                 bundle,
@@ -264,6 +262,4 @@ def load_horizon_results(horizon: str | HorizonSpec) -> pl.DataFrame:
     if legacy.exists() and spec.key == "lifetime":
         return pl.read_parquet(legacy).filter(pl.col("time_horizon") == spec.key)
 
-    raise FileNotFoundError(
-        f"No results at {path}. Run this horizon's 02_simulation.ipynb first."
-    )
+    raise FileNotFoundError(f"No results at {path}. Run this horizon's 02_simulation.ipynb first.")

@@ -209,6 +209,66 @@ SECTION_LAYOUTS: dict[str, tuple[tuple[str, tuple[str, ...]], ...]] = {
             ),
         ),
     ),
+    "ICER vs ABR threshold": (
+        (
+            "Estimated decision threshold",
+            (
+                "comparison",
+                "paired_iterations",
+                "baseline_on_demand_abr",
+                "cost_effective_abr_threshold",
+                "abr_margin",
+                "threshold_found",
+            ),
+        ),
+        (
+            "Observed range and baseline decision uncertainty",
+            (
+                "comparison",
+                "observed_cutoff_min",
+                "observed_cutoff_max",
+                "probability_ce_at_baseline_cutoff",
+            ),
+        ),
+    ),
+    "CEAC decision thresholds": (
+        (
+            "Selected WTP decision",
+            (
+                "comparison",
+                "paired_iterations",
+                "selected_wtp",
+                "probability_ce_at_selected_wtp",
+            ),
+        ),
+        (
+            "Median probability threshold",
+            (
+                "comparison",
+                "wtp_at_50_percent_ce",
+                "crossing_found_in_range",
+                "searched_wtp_max",
+            ),
+        ),
+    ),
+    "Health-state occupation": (
+        (
+            "State occupation",
+            (
+                "scenario",
+                "healthy",
+                "bleeding",
+                "hemarthrosis",
+                "intracranial_hemorrhage",
+                "non_ich_major_bleeding",
+                "death",
+            ),
+        ),
+        (
+            "Occupation validation",
+            ("scenario", "state_share_sum", "state_share_abs_error"),
+        ),
+    ),
 }
 
 

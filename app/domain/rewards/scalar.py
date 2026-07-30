@@ -54,23 +54,15 @@ def consumption(step: int, state: str, **kwargs) -> float:
     k = kwargs.get("event_count", 0)
 
     if state == "bleeding":
-        dose += (
-            weight_val * inputs.factor_consumption_per_spontaneous_bleeding_per_kg * k
-        )
+        dose += weight_val * inputs.factor_consumption_per_spontaneous_bleeding_per_kg * k
 
     elif state == "hemarthrosis":
         dose += weight_val * inputs.factor_consumption_per_joint_bleeding_per_kg * k
 
     elif state == "intracranial_hemorrhage":
-        dose += (
-            weight_val
-            * inputs.factor_consumption_per_intracranial_hemorrhage_per_kg
-        )
+        dose += weight_val * inputs.factor_consumption_per_intracranial_hemorrhage_per_kg
     elif state == "non_ich_major_bleeding":
-        dose += (
-            weight_val
-            * inputs.factor_consumption_per_non_ich_major_bleeding_per_kg
-        )
+        dose += weight_val * inputs.factor_consumption_per_non_ich_major_bleeding_per_kg
 
     return dose
 
@@ -81,15 +73,33 @@ def utility(step: int, state: str, **kwargs) -> float:
 
     utilities = const["utilities"]
 
-    # inline severity resolution (no function call)
-    if score < const["threshold_mild"]:
+    thresholds = const.get("utility_thresholds")
+    if thresholds is None:
+        # Backward-compatible adapter for callers using the former three-band
+        # test fixture. Production workers always supply the JSON thresholds.
+        thresholds = type(
+            "UtilityThresholds",
+            (),
+            {
+                "early_arthropathy": const["threshold_mild"],
+                "moderate_arthropathy": const["threshold_moderate"],
+                "severe_arthropathy": const["threshold_max"],
+                "advanced_arthropathy": const["threshold_max"],
+                "end_stage_arthropathy": const["threshold_max"],
+            },
+        )()
+    if score < thresholds.early_arthropathy:
         arth = utilities.healthy
-    elif score < const["threshold_moderate"]:
+    elif score < thresholds.moderate_arthropathy:
         arth = utilities.mild_arthropathy
-    elif score < const["threshold_max"]:
+    elif score < thresholds.severe_arthropathy:
         arth = utilities.moderate_arthropathy
-    else:
+    elif score < thresholds.advanced_arthropathy:
         arth = utilities.severe_arthropathy
+    elif score < thresholds.end_stage_arthropathy:
+        arth = getattr(utilities, "advanced_arthropathy", utilities.severe_arthropathy)
+    else:
+        arth = getattr(utilities, "end_stage_arthropathy", utilities.severe_arthropathy)
 
     if state == HealthStates.HEALTHY.value:
         u = arth

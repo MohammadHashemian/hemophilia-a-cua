@@ -1,7 +1,19 @@
+import matplotlib
 import numpy as np
 import polars as pl
 
-from app.notebook.psa.economics import economic_summary, paired_outcomes
+matplotlib.use("Agg", force=True)
+
+from matplotlib import pyplot as plt
+
+from app.notebook.psa.analysis import plot_survival
+from app.notebook.psa.economics import (
+    abr_threshold_analysis,
+    abr_threshold_curve,
+    economic_summary,
+    paired_outcomes,
+)
+from app.notebook.psa.report_plots import health_state_distribution
 
 
 def _economic_frame() -> pl.DataFrame:
@@ -55,3 +67,96 @@ def test_incremental_economic_identities():
         summary["delta_cost"] / summary["delta_qaly"],
     )
     assert summary["paired_iterations"] == 3
+
+
+def test_abr_threshold_curve_preserves_iteration_pairing():
+    frame = _economic_frame().with_columns(
+        pl.when(pl.col("scenario").str.contains("on-demand"))
+        .then(pl.Series([1.0, 2.0, 3.0, 0.0, 0.0, 0.0]))
+        .otherwise(pl.Series([1.5, 0.5, 1.0, 0.0, 0.0, 0.0]))
+        .alias("sampled_abr")
+    )
+    curve = abr_threshold_curve(
+        frame,
+        "childhood on-demand bayesian",
+        "childhood prophylaxis bayesian",
+        wtp=1_000,
+        points=3,
+        min_pairs=1,
+    ).sort("abr_cutoff")
+
+    assert curve["paired_iterations"][0] == 3
+    assert curve["paired_iterations"][-1] == 1
+    # At the highest cutoff only base iteration 2 and its matching comparison
+    # iteration 2 remain: delta cost=60 and delta QALY=0.6.
+    assert np.isclose(curve["icer"][-1], 100.0)
+
+
+def test_abr_threshold_summary_reports_nmb_crossing():
+    base = "childhood on-demand bayesian"
+    comparison = "childhood prophylaxis bayesian"
+    frame = pl.DataFrame(
+        {
+            "scenario": [base] * 4 + [comparison] * 4,
+            "iteration_id": [0, 1, 2, 3, 3, 1, 0, 2],
+            "sampled_abr": [1.0, 2.0, 3.0, 4.0, 0.0, 0.0, 0.0, 0.0],
+            "total_cost": [0.0] * 4 + [90.0, 90.0, 90.0, 90.0],
+            "total_qaly": [0.0] * 4 + [0.12, 0.08, 0.04, 0.10],
+        }
+    )
+    _, summary = abr_threshold_analysis(
+        frame,
+        wtp=1_000,
+        points=4,
+        min_pairs=1,
+    )
+    row = summary.row(0, named=True)
+
+    assert row["threshold_found"]
+    assert row["observed_cutoff_min"] <= row["cost_effective_abr_threshold"]
+    assert row["cost_effective_abr_threshold"] <= row["observed_cutoff_max"]
+
+
+def test_health_state_distribution_includes_split_major_bleeding_states():
+    frame = pl.DataFrame(
+        {
+            "scenario": ["childhood on-demand bayesian"],
+            "healthy_share": [0.70],
+            "bleeding_share": [0.10],
+            "hemarthrosis_share": [0.08],
+            "intracranial_hemorrhage_share": [0.01],
+            "non_ich_major_bleeding_share": [0.01],
+            "death_share": [0.10],
+        }
+    )
+    figure = health_state_distribution(frame, "childhood")
+    labels = [text.get_text() for text in figure.axes[0].get_legend().get_texts()]
+    assert labels == [
+        "No bleeding",
+        "Spontaneous bleeding",
+        "Hemarthrosis",
+        "ICH",
+        "Non-ICH major bleeding",
+        "Death",
+    ]
+    plt.close(figure)
+
+
+def test_childhood_survival_uses_clearly_labelled_adaptive_zoom():
+    frame = pl.DataFrame(
+        {
+            "extension": [None, None, None, None],
+            "regime": ["on-demand", "on-demand", "prophylaxis", "prophylaxis"],
+            "cycles": [728, 728, 728, 728],
+            "is_absorbed": [False, False, False, False],
+            "observed_cycles": [728, 728, 728, 728],
+        }
+    )
+    figure, axis = plot_survival(frame, "childhood")
+    lower, upper = axis.get_ylim()
+    assert lower > 0.0
+    assert upper >= 1.0
+    assert axis.get_ylabel() == "Proportion alive (zoomed)"
+    assert any("does not start at 0" in text.get_text() for text in axis.texts)
+    assert all("final survival" in line.get_label() for line in axis.lines)
+    plt.close(figure)

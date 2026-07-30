@@ -17,6 +17,7 @@ something regressed.
 The script is deliberately small and dependency-light so it can be wired
 into CI as a fast guard against future regressions.
 """
+
 from __future__ import annotations
 
 import sys
@@ -35,45 +36,50 @@ from app.persistence.context import ModelContext
 from engine.chains import Chain
 from utils import stable_hash
 
-# Tiny but non-trivial parameter set so the test exercises both the sampler
-# and the Markov engine reward pipeline.
-PARAM_SET = ParameterSet(
-    cycles=Parameter(Constant(80)),
-    bleeding_rate=Parameter(Constant(15.0)),
-    joint_bleeding_fraction=Parameter(Constant(0.3)),
-    gi_neck_bleeding_fraction=Parameter(Constant(95 / 20_295)),
-    iliopsoas_bleeding_fraction=Parameter(Constant(9 / 3_244)),
-    intracranial_hemorrhage_rate=Parameter(Constant(0.01)),
-    ich_case_fatality=Parameter(Constant(0.10)),
-    non_ich_case_fatality=Parameter(Constant(0.0)),
-    baseline_age=Parameter(Constant(2.0)),
-    weight_factor=Parameter(Constant(1.0)),
-    benefits_discount_rate=Parameter(Constant(0.0)),
-    costs_discount_rate=Parameter(Constant(0.0)),
-    healthy_utility=Parameter(Constant(0.9)),
-    mild_arthropathy_utility=Parameter(Constant(0.85)),
-    moderate_arthropathy_utility=Parameter(Constant(0.7)),
-    severe_arthropathy_utility=Parameter(Constant(0.5)),
-    spontaneous_bleeding_utility=Parameter(Constant(0.6)),
-    joint_bleeding_utility=Parameter(Constant(0.5)),
-    intracranial_hemorrhage_utility=Parameter(Constant(0.3)),
-    non_ich_major_bleeding_utility=Parameter(Constant(0.3)),
-    death_utility=Parameter(Constant(0.0)),
-    per_unit_price=Parameter(Constant(1000.0)),
-    prophylaxis_background_factor_consumption_per_kg=Parameter(Constant(0.0)),
-    factor_consumption_per_spontaneous_bleeding_per_kg=Parameter(Constant(10.0)),
-    factor_consumption_per_joint_bleeding_per_kg=Parameter(Constant(20.0)),
-    factor_consumption_per_intracranial_hemorrhage_per_kg=Parameter(Constant(50.0)),
-    factor_consumption_per_non_ich_major_bleeding_per_kg=Parameter(Constant(50.0)),
-)
+
+def _parameter_set(context: ModelContext) -> ParameterSet:
+    """Tiny parameter set whose utility inputs still come from utilities.json."""
+    utilities = context.utilities.state_utilities
+    return ParameterSet(
+        cycles=Parameter(Constant(80)),
+        bleeding_rate=Parameter(Constant(15.0)),
+        joint_bleeding_fraction=Parameter(Constant(0.3)),
+        gi_neck_bleeding_fraction=Parameter(Constant(95 / 20_295)),
+        iliopsoas_bleeding_fraction=Parameter(Constant(9 / 3_244)),
+        intracranial_hemorrhage_rate=Parameter(Constant(0.01)),
+        ich_case_fatality=Parameter(Constant(0.10)),
+        non_ich_case_fatality=Parameter(Constant(0.0)),
+        baseline_age=Parameter(Constant(2.0)),
+        weight_factor=Parameter(Constant(1.0)),
+        benefits_discount_rate=Parameter(Constant(0.0)),
+        costs_discount_rate=Parameter(Constant(0.0)),
+        healthy_utility=Parameter(Constant(utilities.healthy.mean)),
+        mild_arthropathy_utility=Parameter(Constant(utilities.mild_arthropathy.mean)),
+        moderate_arthropathy_utility=Parameter(Constant(utilities.moderate_arthropathy.mean)),
+        severe_arthropathy_utility=Parameter(Constant(utilities.severe_arthropathy.mean)),
+        advanced_arthropathy_utility=Parameter(Constant(utilities.advanced_arthropathy.mean)),
+        end_stage_arthropathy_utility=Parameter(Constant(utilities.end_stage_arthropathy.mean)),
+        spontaneous_bleeding_utility=Parameter(Constant(utilities.bleeding.mean)),
+        joint_bleeding_utility=Parameter(Constant(utilities.hemarthrosis.mean)),
+        intracranial_hemorrhage_utility=Parameter(Constant(utilities.intracranial_hemorrhage.mean)),
+        non_ich_major_bleeding_utility=Parameter(Constant(utilities.non_ich_major_bleeding.mean)),
+        death_utility=Parameter(Constant(utilities.death.mean)),
+        per_unit_price=Parameter(Constant(1000.0)),
+        prophylaxis_background_factor_consumption_per_kg=Parameter(Constant(0.0)),
+        factor_consumption_per_spontaneous_bleeding_per_kg=Parameter(Constant(10.0)),
+        factor_consumption_per_joint_bleeding_per_kg=Parameter(Constant(20.0)),
+        factor_consumption_per_intracranial_hemorrhage_per_kg=Parameter(Constant(50.0)),
+        factor_consumption_per_non_ich_major_bleeding_per_kg=Parameter(Constant(50.0)),
+    )
+
 
 SCENARIO_NAME = "smoke on_demand bayesian"
 N_ITERS = 16
 WORKER_ID = 0
 
 
-def _build_inputs(env_seed: int) -> tuple[list, Chain, Scenario]:
-    sampler = PSASampler(PARAM_SET, seed=env_seed)
+def _build_inputs(env_seed: int, context: ModelContext) -> tuple[list, Chain, Scenario]:
+    sampler = PSASampler(_parameter_set(context), seed=env_seed)
     samples = sampler.sample(n=N_ITERS)
     resolved = ParameterResolver.resolve_samples(samples)
     inputs = [ParameterResolver.build_single(resolved, i) for i in range(N_ITERS)]
@@ -87,10 +93,9 @@ def _build_inputs(env_seed: int) -> tuple[list, Chain, Scenario]:
 
 
 def _run_once(env_seed: int):
-    inputs, chain, scenario = _build_inputs(env_seed)
-    return worker_function_batch(
-        chain, inputs, scenario, ModelContext.load(), worker_id=WORKER_ID,
-    )
+    context = ModelContext.load()
+    inputs, chain, scenario = _build_inputs(env_seed, context)
+    return worker_function_batch(chain, inputs, scenario, context, worker_id=WORKER_ID)
 
 
 def main() -> int:
