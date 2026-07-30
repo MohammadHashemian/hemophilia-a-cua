@@ -3,7 +3,11 @@ import numpy as np
 from app.analysis.psa.parameter_resolver import ParameterResolver
 from app.domain.enums import HealthStates
 from app.domain.inputs import ModelInput
-from app.domain.transition_builder import AgeBasedMortalityModifier, build_transition_matrix
+from app.domain.transition_builder import (
+    AgeBasedMortalityModifier,
+    build_transition_matrices,
+    build_transition_matrix,
+)
 from app.persistence.schemas.mortality import MortalityFile
 
 
@@ -74,6 +78,32 @@ def test_transition_rows_are_stochastic_and_death_is_absorbing():
     assert np.allclose(matrix.sum(axis=1), 1.0)
     death = states.index("death")
     assert np.array_equal(matrix[death], np.eye(len(states))[death])
+
+
+def test_vectorized_matrix_builder_matches_scalar_builder():
+    states = [state.value for state in HealthStates]
+    inputs = [
+        _input(),
+        _input(
+            spontaneous_bleeding_rate=1.5,
+            joint_bleeding_rate=3.2,
+            intracranial_hemorrhage_rate=0.003,
+            non_ich_major_bleeding_rate=0.04,
+            ich_case_fatality=0.17,
+            non_ich_case_fatality=0.03,
+        ),
+        _input(
+            spontaneous_bleeding_rate=0.0,
+            joint_bleeding_rate=0.0,
+            intracranial_hemorrhage_rate=0.0,
+            non_ich_major_bleeding_rate=0.0,
+        ),
+    ]
+    vectorized = build_transition_matrices(inputs, states)
+    expected = np.stack(
+        [build_transition_matrix(model_input, states) for model_input in inputs]
+    )
+    assert np.allclose(vectorized, expected, atol=1e-14, rtol=0.0)
 
 
 def test_ordinary_event_rows_reuse_fresh_weekly_distribution():

@@ -167,6 +167,109 @@ def _with_case_fatality(
     return row
 
 
+def build_transition_matrices(
+    inputs: list[ModelInput],
+    states: list[str],
+) -> np.ndarray:
+    """Build all PSA transition matrices with NumPy broadcasting."""
+    if not inputs:
+        return np.empty((0, len(states), len(states)), dtype=np.float64)
+
+    required_states = {state.value for state in HealthStates}
+    missing = required_states.difference(states)
+    if missing:
+        raise ValueError(f"Transition matrix is missing required states: {missing}")
+
+    state_idx = {state: i for i, state in enumerate(states)}
+    n_iters = len(inputs)
+    n_states = len(states)
+    annual_hazards = np.column_stack(
+        (
+            np.fromiter(
+                (item.spontaneous_bleeding_rate for item in inputs),
+                dtype=np.float64,
+                count=n_iters,
+            ),
+            np.fromiter(
+                (item.joint_bleeding_rate for item in inputs),
+                dtype=np.float64,
+                count=n_iters,
+            ),
+            np.fromiter(
+                (item.intracranial_hemorrhage_rate for item in inputs),
+                dtype=np.float64,
+                count=n_iters,
+            ),
+            np.fromiter(
+                (item.non_ich_major_bleeding_rate for item in inputs),
+                dtype=np.float64,
+                count=n_iters,
+            ),
+        )
+    )
+    if np.any(annual_hazards < 0.0):
+        raise ValueError("Annual bleeding-event hazards must be non-negative.")
+
+    weekly_hazards = annual_hazards / 52.0
+    total_hazard = weekly_hazards.sum(axis=1)
+    survival = np.exp(-total_hazard)
+    event_mass = 1.0 - survival
+    event_probs = np.divide(
+        weekly_hazards,
+        total_hazard[:, None],
+        out=np.zeros_like(weekly_hazards),
+        where=total_hazard[:, None] > 0.0,
+    )
+    event_probs *= event_mass[:, None]
+
+    ordinary_rows = np.zeros((n_iters, n_states), dtype=np.float64)
+    ordinary_rows[:, state_idx[HealthStates.NO_BLEEDING.value]] = survival
+    destinations = (
+        HealthStates.BLEEDING.value,
+        HealthStates.HEMARTHROSIS.value,
+        HealthStates.INTRACRANIAL_HEMORRHAGE.value,
+        HealthStates.NON_ICH_MAJOR_BLEEDING.value,
+    )
+    for column, destination in enumerate(destinations):
+        ordinary_rows[:, state_idx[destination]] = event_probs[:, column]
+
+    matrices = np.zeros((n_iters, n_states, n_states), dtype=np.float64)
+    for state in (
+        HealthStates.NO_BLEEDING.value,
+        HealthStates.BLEEDING.value,
+        HealthStates.HEMARTHROSIS.value,
+    ):
+        matrices[:, state_idx[state], :] = ordinary_rows
+
+    death_idx = state_idx[HealthStates.DEATH.value]
+    fatality_specs = (
+        (
+            HealthStates.INTRACRANIAL_HEMORRHAGE.value,
+            np.fromiter(
+                (item.ich_case_fatality for item in inputs),
+                dtype=np.float64,
+                count=n_iters,
+            ),
+        ),
+        (
+            HealthStates.NON_ICH_MAJOR_BLEEDING.value,
+            np.fromiter(
+                (item.non_ich_case_fatality for item in inputs),
+                dtype=np.float64,
+                count=n_iters,
+            ),
+        ),
+    )
+    for state, fatality in fatality_specs:
+        fatality = np.clip(fatality, 0.0, 1.0)
+        row = ordinary_rows * (1.0 - fatality[:, None])
+        row[:, death_idx] += fatality
+        matrices[:, state_idx[state], :] = row
+
+    matrices[:, death_idx, death_idx] = 1.0
+    return matrices
+
+
 def build_transition_matrix(
     inputs: "ModelInput",
     states: list[str],

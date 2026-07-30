@@ -33,8 +33,6 @@ from __future__ import annotations
 import numpy as np
 from scipy.stats import poisson
 
-from utils.math import cal_body_weight
-
 # State name -> index (filled by setup_vectorized_rewards)
 _STATE_IDX: dict[str, int] = {}
 
@@ -81,12 +79,8 @@ def store_weight(step, state_idx, store_arrays, shared_kwargs, rng):
     """
     per_iter = shared_kwargs["per_iter"]
     weight_factor = per_iter["weight_factor"]
-    baseline_age_weeks = shared_kwargs["baseline_age_weeks"]
-    week = int(step + baseline_age_weeks)
-    return np.array(
-        [cal_body_weight(week, 0, float(wf)) for wf in weight_factor],
-        dtype=np.float64,
-    )
+    base_weight = shared_kwargs["base_weight_by_step"][step]
+    return np.round(base_weight * weight_factor, 2)
 
 
 def store_event_count(step, state_idx, store_arrays, shared_kwargs, rng):
@@ -126,7 +120,6 @@ def store_event_count(step, state_idx, store_arrays, shared_kwargs, rng):
     lam[in_bleeding] = lam_bleed[in_bleeding]
     lam[in_hemarthrosis] = lam_joint[in_hemarthrosis]
 
-    # k_max from Poisson(lam) ppf(0.9999) — cap at 50 for safety
     # A single vectorized inverse-CDF operation replaces the former Python
     # loop that rebuilt a truncated PMF for every active iteration.
     u = rng.random(n_iters)

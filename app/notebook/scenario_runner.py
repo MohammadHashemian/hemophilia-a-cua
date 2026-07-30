@@ -1,8 +1,11 @@
 import gc
+import os
 import time
 import uuid
 from collections.abc import Callable
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
+from threading import Lock
 from typing import Literal
 
 import enlighten
@@ -15,6 +18,7 @@ from app.notebook.scenario_helpers import pair_scenarios
 from app.persistence.context import ModelContext
 from engine.chains import Chain
 from engine.runners import ScenarioRunner, SimulationResult
+from utils import stable_hash
 from utils.logging import setup_root_logger
 
 
@@ -46,6 +50,11 @@ class _Info:
     SAVED_COMBINED_RESULTS = "Saved combined results checkpoint to %s"
     SAVED_PAIR_RESULTS = "Saved Parquet for pair %s vs %s -> %s"
     SAVED_FINAL_RESULTS = "Saved %d final parquet files to %s"
+    USING_SCENARIO_CACHE = "Reusing scenario cache for %s"
+    INVALID_SCENARIO_CACHE = "Ignoring invalid scenario cache for %s"
+    SCENARIO_CACHE_SUMMARY = (
+        "Scenario cache: %d reusable, %d require simulation"
+    )
 
 
 def batch_generator(bundles: list[ScenarioBundle[ModelInput]], batch_size: int):
@@ -57,11 +66,62 @@ def _safe_name(s: str) -> str:
     return s.replace(" ", "_").replace("/", "_")
 
 
+def _available_memory_bytes() -> int | None:
+    """Best-effort available-memory query without an external dependency."""
+    if os.name == "nt":
+        import ctypes
+
+        class MemoryStatus(ctypes.Structure):
+            _fields_ = [
+                ("length", ctypes.c_ulong),
+                ("memory_load", ctypes.c_ulong),
+                ("total_physical", ctypes.c_ulonglong),
+                ("available_physical", ctypes.c_ulonglong),
+                ("total_page_file", ctypes.c_ulonglong),
+                ("available_page_file", ctypes.c_ulonglong),
+                ("total_virtual", ctypes.c_ulonglong),
+                ("available_virtual", ctypes.c_ulonglong),
+                ("available_extended_virtual", ctypes.c_ulonglong),
+            ]
+
+        status = MemoryStatus()
+        status.length = ctypes.sizeof(MemoryStatus)
+        if ctypes.windll.kernel32.GlobalMemoryStatusEx(ctypes.byref(status)):
+            return int(status.available_physical)
+        return None
+    try:
+        pages = os.sysconf("SC_AVPHYS_PAGES")
+        page_size = os.sysconf("SC_PAGE_SIZE")
+        return int(pages * page_size)
+    except (AttributeError, OSError, ValueError):
+        return None
+
+
+def _parallel_worker_count(
+    batch: list[ScenarioBundle[ModelInput]],
+    requested: int,
+) -> int:
+    """Cap concurrency when full trace arrays would put RAM at risk."""
+    requested = max(1, min(requested, len(batch)))
+    if requested == 1 or not batch:
+        return requested
+    largest = max(
+        len(bundle.inputs) * (int(bundle.inputs[0].cycle) + 1) * 96
+        for bundle in batch
+    )
+    available = _available_memory_bytes()
+    if available is None or largest <= 0:
+        return requested
+    memory_limit = max(1, int((available * 0.55) // largest))
+    return max(1, min(requested, memory_limit))
+
+
 def _run_batch(
     batch: list[ScenarioBundle[ModelInput]],
     context: ModelContext,
     identity_chain: Chain,
     batch_worker_function: Callable,
+    max_parallel_scenarios: int,
 ) -> list[SimulationResult]:
     """Run each scenario in the batch via the vectorized batch worker.
 
@@ -78,25 +138,50 @@ def _run_batch(
     """
     run_id = uuid.uuid4().hex
     manager = enlighten.get_manager()
-    results: list[SimulationResult] = []
-    for worker_id, bundle in enumerate(batch):
+    total_iterations = sum(len(bundle.inputs) for bundle in batch)
+    progress = manager.counter(
+        total=total_iterations,
+        desc="Vectorized scenarios",
+        unit="iter",
+    )
+    progress_lock = Lock()
+    reported: dict[str, int] = {}
+    workers = _parallel_worker_count(batch, max_parallel_scenarios)
+    logger = setup_root_logger()
+    if workers < min(max_parallel_scenarios, len(batch)):
+        logger.info(
+            "Memory guard reduced parallel scenarios from %d to %d",
+            min(max_parallel_scenarios, len(batch)),
+            workers,
+        )
+
+    def run_one(
+        position: int,
+        bundle: ScenarioBundle[ModelInput],
+    ) -> tuple[int, list[SimulationResult], float]:
         scenario = bundle.scenario
         inputs = bundle.inputs
         scenario_name = getattr(scenario, "name", str(scenario))
+        worker_id = stable_hash(
+            context.simulation.environment.seed,
+            scenario_name,
+        )
         n_iters = len(inputs)
         steps = int(inputs[0].cycle)
         n_years = max(steps // 52, 1)
         iters_per_year_tick = max(1, n_iters // n_years)
 
-        progress = manager.counter(
-            total=n_iters,
-            desc=f"Batch Simulation | {scenario_name} | {n_iters} iters",
-            unit="iter",
-        )
+        reported[scenario_name] = 0
 
         def _on_step(step: int, total_steps: int) -> None:
-            progress.update(iters_per_year_tick)
+            with progress_lock:
+                remaining = n_iters - reported[scenario_name]
+                increment = min(iters_per_year_tick, remaining)
+                if increment > 0:
+                    progress.update(increment)
+                    reported[scenario_name] += increment
 
+        started = time.perf_counter()
         outputs = batch_worker_function(
             chain=identity_chain,
             inputs=inputs,
@@ -107,16 +192,16 @@ def _run_batch(
             progress_callback=_on_step,
             progress_every=52,
         )
-        # Integer-division rounding can leave a few iters unreported
-        # (e.g. 10000 iters / 98 years = 102 per year, 98 * 102 = 9996).
-        # Force the bar to 100% so the ETA settles cleanly.
-        remaining = n_iters - progress.count
-        if remaining > 0:
-            progress.update(remaining, force=True)
-        progress.close()
+        elapsed = time.perf_counter() - started
+        with progress_lock:
+            remaining = n_iters - reported[scenario_name]
+            if remaining > 0:
+                progress.update(remaining, force=True)
+                reported[scenario_name] += remaining
 
+        scenario_results: list[SimulationResult] = []
         for input_data, output in zip(inputs, outputs, strict=True):
-            results.append(
+            scenario_results.append(
                 SimulationResult(
                     run_id=run_id,
                     scenario=scenario_name,
@@ -125,7 +210,32 @@ def _run_batch(
                     output=output,
                 )
             )
-    return results
+        return position, scenario_results, elapsed
+
+    ordered_results: dict[int, list[SimulationResult]] = {}
+    with ThreadPoolExecutor(
+        max_workers=workers,
+        thread_name_prefix="psa-scenario",
+    ) as executor:
+        futures = {
+            executor.submit(run_one, position, bundle): bundle.scenario.name
+            for position, bundle in enumerate(batch)
+        }
+        for future in as_completed(futures):
+            position, scenario_results, elapsed = future.result()
+            ordered_results[position] = scenario_results
+            logger.info(
+                "Scenario complete: %s in %.2fs",
+                futures[future],
+                elapsed,
+            )
+
+    progress.close()
+    return [
+        result
+        for position in range(len(batch))
+        for result in ordered_results[position]
+    ]
 
 
 class _ValidationErrors:
@@ -158,6 +268,7 @@ def validate_simulation_inputs(
     temp_dir: Path,
     engine: Literal["pathos", "multiprocessing", "batch"],
     batch_worker_function: Callable | None,
+    max_parallel_scenarios: int,
 ) -> None:
     """Pre-flight validation for ``run_scenarios_in_batches``.
 
@@ -183,6 +294,8 @@ def validate_simulation_inputs(
         raise ValueError(_ValidationErrors.INVALID_ENGINE % (engine,))
     if engine == "batch" and batch_worker_function is None:
         raise ValueError(_ValidationErrors.NO_BATCH_WORKER)
+    if max_parallel_scenarios <= 0:
+        raise ValueError("max_parallel_scenarios must be a positive integer")
 
     if not output_dir.exists():
         output_dir.mkdir(parents=True, exist_ok=True)
@@ -241,9 +354,11 @@ def run_scenarios_in_batches(
     batch_size: int,
     output_dir: Path,
     temp_dir: Path,
-    options: dict = {"use_cache_temp": False},
+    options: dict | None = None,
     engine: Literal["pathos", "multiprocessing", "batch"] = "pathos",
     batch_worker_function: Callable | None = None,
+    scenario_fingerprints: dict[str, str] | None = None,
+    max_parallel_scenarios: int = 2,
 ):
     """Run scenario bundles in batches, write per-pair Parquet files, and free memory after each batch.
 
@@ -271,6 +386,7 @@ def run_scenarios_in_batches(
         temp_dir=temp_dir,
         engine=engine,
         batch_worker_function=batch_worker_function,
+        max_parallel_scenarios=max_parallel_scenarios,
     )
 
     logger.info(
@@ -279,6 +395,7 @@ def run_scenarios_in_batches(
         batch_size,
         engine,
     )
+    options = options or {}
     use_cached_temp: bool = options.get("use_cache_temp", False)
 
     if not output_dir.exists():
@@ -288,8 +405,50 @@ def run_scenarios_in_batches(
         logger.info(_Errors.MISSING_TEMP_DIR, temp_dir)
         temp_dir.mkdir(parents=True, exist_ok=True)
 
-    temp_files = []
-    if use_cached_temp:
+    temp_files: list[Path] = []
+    bundles_to_run = bundles
+    scenario_cache_paths: dict[str, Path] = {}
+
+    if scenario_fingerprints is not None:
+        scenario_cache_dir = temp_dir / "scenario_cache"
+        scenario_cache_dir.mkdir(parents=True, exist_ok=True)
+        bundles_to_run = []
+        for bundle in bundles:
+            scenario_name = bundle.scenario.name
+            fingerprint = scenario_fingerprints.get(scenario_name)
+            if fingerprint is None:
+                raise ValueError(
+                    f"Missing cache fingerprint for scenario '{scenario_name}'"
+                )
+            cache_path = scenario_cache_dir / (
+                f"{_safe_name(scenario_name)[:40]}__{fingerprint[:32]}.parquet"
+            )
+            scenario_cache_paths[scenario_name] = cache_path
+            if cache_path.exists():
+                try:
+                    cached_scenarios = pl.read_parquet(
+                        cache_path,
+                        columns=["scenario"],
+                    )
+                    valid = (
+                        cached_scenarios.height == len(bundle.inputs)
+                        and cached_scenarios["scenario"].n_unique() == 1
+                        and cached_scenarios["scenario"][0] == scenario_name
+                    )
+                except Exception:
+                    valid = False
+                if valid:
+                    temp_files.append(cache_path)
+                    logger.info(_Info.USING_SCENARIO_CACHE, scenario_name)
+                    continue
+                logger.warning(_Info.INVALID_SCENARIO_CACHE, scenario_name)
+            bundles_to_run.append(bundle)
+        logger.info(
+            _Info.SCENARIO_CACHE_SUMMARY,
+            len(temp_files),
+            len(bundles_to_run),
+        )
+    elif use_cached_temp:
         # Step 0: Load cache from temp storage
         temp_files = sorted(temp_dir.glob("batch_*.parquet"))
         if temp_files:
@@ -304,22 +463,34 @@ def run_scenarios_in_batches(
                 temp_dir,
             )
 
-    if not use_cached_temp or not temp_files:
+    if bundles_to_run and (
+        scenario_fingerprints is not None
+        or not use_cached_temp
+        or not temp_files
+    ):
         # Step 1: Process batches and save each to temp storage
-        temp_files = []
-        total_batches = (len(bundles) + batch_size - 1) // batch_size
+        if scenario_fingerprints is None:
+            temp_files = []
+        total_batches = (len(bundles_to_run) + batch_size - 1) // batch_size
         batch_start_time = time.perf_counter()
+        simulation_seconds = 0.0
+        dataframe_seconds = 0.0
+        cache_write_seconds = 0.0
         processed_scenarios = 0
 
-        for index, batch in enumerate(batch_generator(bundles, batch_size)):
+        for index, batch in enumerate(batch_generator(bundles_to_run, batch_size)):
             if engine == "batch":
+                phase_started = time.perf_counter()
                 batch_results = _run_batch(
                     batch=batch,
                     context=context,
                     identity_chain=identity_chain,
                     batch_worker_function=batch_worker_function or worker_function,
+                    max_parallel_scenarios=max_parallel_scenarios,
                 )
+                simulation_seconds += time.perf_counter() - phase_started
             else:
+                phase_started = time.perf_counter()
                 runner = ScenarioRunner(
                     context=context,
                     scenario_bundles=batch,
@@ -328,29 +499,61 @@ def run_scenarios_in_batches(
                     backend=engine,
                 )
                 batch_results = runner.run_all()
+                simulation_seconds += time.perf_counter() - phase_started
 
             # convert to DataFrame using existing helper
+            phase_started = time.perf_counter()
             try:
                 batch_df = build_df(results=batch_results, context=context)
             except Exception:
                 logger.exception(_Errors.FAILED_TO_BUILD_DF)
                 batch_df = pl.DataFrame()
+            dataframe_seconds += time.perf_counter() - phase_started
 
-            # save temp batch file
+            # Save either fingerprint-addressed scenario files or the legacy
+            # coarse batch file.
+            phase_started = time.perf_counter()
             if not batch_df.is_empty():
-                temp_path = temp_dir / f"batch_{index}.parquet"
-                try:
-                    batch_df.write_parquet(temp_path)
-                    temp_files.append(temp_path)
-                    logger.info(_Info.SAVED_BATCH, index, temp_path)
-                except Exception as e:
-                    logger.exception(_Errors.FAILED_BATCH_SAVE, temp_path, e.__str__())
+                if scenario_fingerprints is not None:
+                    for bundle in batch:
+                        scenario_name = bundle.scenario.name
+                        scenario_df = batch_df.filter(
+                            pl.col("scenario") == scenario_name
+                        )
+                        temp_path = scenario_cache_paths[scenario_name]
+                        try:
+                            scenario_df.write_parquet(temp_path)
+                            temp_files.append(temp_path)
+                            logger.info(
+                                _Info.SAVED_BATCH,
+                                index,
+                                temp_path,
+                            )
+                        except Exception as e:
+                            logger.exception(
+                                _Errors.FAILED_BATCH_SAVE,
+                                temp_path,
+                                e.__str__(),
+                            )
+                else:
+                    temp_path = temp_dir / f"batch_{index}.parquet"
+                    try:
+                        batch_df.write_parquet(temp_path)
+                        temp_files.append(temp_path)
+                        logger.info(_Info.SAVED_BATCH, index, temp_path)
+                    except Exception as e:
+                        logger.exception(
+                            _Errors.FAILED_BATCH_SAVE,
+                            temp_path,
+                            e.__str__(),
+                        )
+            cache_write_seconds += time.perf_counter() - phase_started
 
             processed_scenarios += len(batch)
             elapsed = time.perf_counter() - batch_start_time
             avg_batch_time = elapsed / (index + 1)
             batches_remaining = total_batches - (index + 1)
-            scenarios_remaining = len(bundles) - processed_scenarios
+            scenarios_remaining = len(bundles_to_run) - processed_scenarios
             remaining_time = avg_batch_time * batches_remaining
             logger.info(
                 _Info.BATCH_COMPLETE + _Info.ELAPSED,
@@ -371,8 +574,17 @@ def run_scenarios_in_batches(
                 pass
             gc.collect()
 
+        logger.info(
+            "Execution phases: simulation=%.2fs, dataframe=%.2fs, "
+            "cache_write=%.2fs",
+            simulation_seconds,
+            dataframe_seconds,
+            cache_write_seconds,
+        )
+
     # Step 2: Read all temp files and combine by scenario pair
     logger.info(_Info.COMBINING_TEMP_BATCHES, len(temp_files))
+    combine_started = time.perf_counter()
     if temp_files:
         all_results_df = pl.concat(
             [pl.read_parquet(f) for f in temp_files],
@@ -380,6 +592,7 @@ def run_scenarios_in_batches(
         )
     else:
         all_results_df = pl.DataFrame()
+    combine_seconds = time.perf_counter() - combine_started
 
     if all_results_df.is_empty():
         logger.warning(_Errors.NO_RESULTS_COMBINED)
@@ -395,6 +608,7 @@ def run_scenarios_in_batches(
 
     # Step 3: Group and write per-pair parquet files
     saved_files = []
+    final_write_started = time.perf_counter()
     try:
         all_pairs = pair_scenarios(all_results_df["scenario"].unique().to_list())
     except Exception:
@@ -436,4 +650,9 @@ def run_scenarios_in_batches(
         logger.exception(_Errors.FAILED_TO_CLEAN_TEMP_DIRECTORY, temp_dir)
 
     logger.info(_Info.SAVED_FINAL_RESULTS, len(saved_files), output_dir)
+    logger.info(
+        "Output phases: combine=%.2fs, final_write=%.2fs",
+        combine_seconds,
+        time.perf_counter() - final_write_started,
+    )
     return saved_files

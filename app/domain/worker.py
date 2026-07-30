@@ -20,11 +20,16 @@ from app.domain.rewards.vectorized import (
     register_state_index,
 )
 from app.domain.scenario import Scenario
-from app.domain.transition_builder import AgeBasedMortalityModifier, build_transition_matrix
+from app.domain.transition_builder import (
+    AgeBasedMortalityModifier,
+    build_transition_matrices,
+    build_transition_matrix,
+)
 from app.persistence.context import ModelContext
 from app.persistence.schemas.utilities import StateUtilities
 from engine.chains import Chain, MarkovChains
 from engine.vectorized import BatchMarkovChain, BatchResult
+from utils.math import cal_base_body_weight
 
 
 def setup_rewards(
@@ -284,11 +289,8 @@ def _build_shared_per_iter(inputs: list[ModelInput], states: list[str]) -> dict:
 def _build_all_matrices(
     inputs: list[ModelInput], states: list[str]
 ) -> np.ndarray:
-    """Build per-iter transition matrices and stack into (n_iters, n, n)."""
-    matrices = np.empty((len(inputs), len(states), len(states)), dtype=np.float64)
-    for i, inp in enumerate(inputs):
-        matrices[i] = build_transition_matrix(inp, states)
-    return matrices
+    """Build every PSA transition matrix in one broadcast operation."""
+    return build_transition_matrices(inputs, states)
 
 
 def _aggregate_vectorized_output(
@@ -391,6 +393,15 @@ def worker_function_batch(
         "conversion_factor": context.clinical.clinical_scoring.pettersson_score.conversion_factor,
         "weekly_discount": weekly_discount,
         "baseline_age_weeks": float(inputs[0].baseline_age) * 52,
+        "base_weight_by_step": np.array(
+            [
+                cal_base_body_weight(
+                    int(float(inputs[0].baseline_age) * 52) + step
+                )
+                for step in range(steps + 1)
+            ],
+            dtype=np.float64,
+        ),
     }
 
     # 4. Run vectorized walk

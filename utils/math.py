@@ -18,6 +18,40 @@ def factorial_numba(n: int):
 
 
 @jit(cache=True, fastmath=True)
+def cal_base_body_weight(week: int | float, b: int | float = 0) -> float:
+    """Return the unrounded age-specific base weight before PSA scaling."""
+    week += b
+
+    if not isinstance(week, int) or week < 0 or week > 5200:
+        raise ValueError(
+            "Week must be an integer between 0 and 5200 (approx. 100 years)"
+        )
+
+    A1 = 150.0
+    B1 = 3.0116
+    K1 = 0.00133
+    A2 = 88.51
+    B2 = 0.6982
+    K2 = 0.003955
+    childhood_end_week = 676
+    transition_week = 2860
+
+    if week <= childhood_end_week:
+        return A1 * math.exp(-B1 * math.exp(-K1 * week))
+    if week <= transition_week:
+        return A2 * math.exp(-B2 * math.exp(-K2 * (week - childhood_end_week)))
+
+    peak_weight = A2 * math.exp(
+        -B2 * math.exp(-K2 * (transition_week - childhood_end_week))
+    )
+    late_asymptote = 75.0
+    decline_rate = 0.00015
+    return late_asymptote + (peak_weight - late_asymptote) * math.exp(
+        -decline_rate * (week - transition_week)
+    )
+
+
+@jit(cache=True, fastmath=True)
 def cal_body_weight(
     week: int | float, b: int | float = 0, weight_factor: float = 1.0
 ) -> float:
@@ -51,47 +85,7 @@ def cal_body_weight(
     Returns:
         float: Estimated weight in kg, rounded to 2 decimals
     """
-    week += b
-
-    # NOTE: Disable if assume valid inputs
-    if not isinstance(week, int) or week < 0 or week > 5200:
-        raise ValueError(
-            "Week must be an integer between 0 and 5200 (approx. 100 years)"
-        )
-
-    # Childhood segment (0-13 y) — Gompertz parameters fitted to
-    # WHO/CDC male median weights at 0-13 y
-    A1 = 150.0
-    B1 = 3.0116
-    K1 = 0.00133
-
-    # Adolescent/adult segment (13-55 y) — value-continuous at 676 wk:
-    # v0 = A1*exp(-B1*exp(-K1*676)); B2 = -ln(v0/A2)
-    A2 = 88.51
-    B2 = 0.6982
-    K2 = 0.003955
-
-    # Segment joints
-    childhood_end_week = 676  # ~13 years
-    transition_week = 2860  # 55 years (start of late-life decline)
-
-    if week <= childhood_end_week:
-        weight = A1 * math.exp(-B1 * math.exp(-K1 * week))
-    elif week <= transition_week:
-        weight = A2 * math.exp(-B2 * math.exp(-K2 * (week - childhood_end_week)))
-    else:
-        # Decline phase: exponential decay from peak toward late-life asymptote
-        peak_weight = A2 * math.exp(
-            -B2 * math.exp(-K2 * (transition_week - childhood_end_week))
-        )
-        late_asymptote = 75.0  # Realistic floor for very old age
-        decline_rate = 0.00015  # Slow decay for ~15-18 kg drop over 45 years
-
-        weight = late_asymptote + (peak_weight - late_asymptote) * math.exp(
-            -decline_rate * (week - transition_week)
-        )
-
-    return round(weight * weight_factor, 2)
+    return round(cal_base_body_weight(week, b) * weight_factor, 2)
 
 
 # @vectorize([float64(float64)], target="cpu")

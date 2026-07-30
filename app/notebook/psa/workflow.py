@@ -2,7 +2,12 @@
 
 from __future__ import annotations
 
+import hashlib
+import json
 import pickle
+import struct
+import time
+from dataclasses import fields
 from pathlib import Path
 
 import numpy as np
@@ -22,6 +27,18 @@ from engine.chains import Chain
 from utils import stable_hash
 from utils.logging import setup_root_logger
 from utils.path_utils import get_project_root
+
+_SCENARIO_CACHE_VERSION = "scenario-cache-v1"
+_SIMULATION_CODE_PATHS = (
+    "app/domain/transition_builder.py",
+    "app/domain/worker.py",
+    "app/domain/rewards/vectorized.py",
+    "app/notebook/dataframe_builders.py",
+    "app/notebook/scenario_runner.py",
+    "app/analysis/psa/parameter_resolver.py",
+    "engine/vectorized.py",
+    "utils/math.py",
+)
 
 
 def horizon_cache_dir(root: Path, horizon: str | HorizonSpec) -> Path:
@@ -105,26 +122,108 @@ def identity_chain() -> Chain:
     )
 
 
+def _simulation_code_digest(root: Path) -> str:
+    digest = hashlib.sha256()
+    digest.update(_SCENARIO_CACHE_VERSION.encode())
+    for relative_path in _SIMULATION_CODE_PATHS:
+        path = root / relative_path
+        digest.update(relative_path.encode())
+        digest.update(path.read_bytes())
+    return digest.hexdigest()
+
+
+def scenario_cache_fingerprint(
+    bundle: ScenarioBundle[ModelInput],
+    context: ModelContext,
+    *,
+    code_digest: str,
+) -> str:
+    """Hash every value that can affect a scenario's cached output."""
+    digest = hashlib.sha256()
+    digest.update(_SCENARIO_CACHE_VERSION.encode())
+    digest.update(code_digest.encode())
+    digest.update(
+        json.dumps(
+            bundle.scenario.model_dump(mode="json", exclude={"overrides"}),
+            sort_keys=True,
+            separators=(",", ":"),
+            default=str,
+        ).encode()
+    )
+    context_payload = {
+        "simulation": context.simulation.model_dump(mode="json"),
+        "clinical": context.clinical.model_dump(mode="json"),
+        "costs": context.costs.model_dump(mode="json"),
+        "economic_policy": context.economic_policy.model_dump(mode="json"),
+        "utilities": context.utilities.model_dump(mode="json"),
+        "mortality": context.mortality.model_dump(mode="json"),
+    }
+    digest.update(
+        json.dumps(
+            context_payload,
+            sort_keys=True,
+            separators=(",", ":"),
+            default=str,
+        ).encode()
+    )
+    model_fields = fields(ModelInput)
+    digest.update(str(len(bundle.inputs)).encode())
+    for field in model_fields:
+        digest.update(field.name.encode())
+    for model_input in bundle.inputs:
+        for field in model_fields:
+            digest.update(struct.pack("!d", float(getattr(model_input, field.name))))
+    return digest.hexdigest()
+
+
 def run_horizon(
     horizon: str | HorizonSpec,
     *,
     sample_size: int | None = None,
     batch_size: int = 4,
+    resume: bool = True,
+    max_parallel_scenarios: int = 2,
 ) -> Path:
+    total_started = time.perf_counter()
     spec = get_horizon(horizon)
     root = get_project_root()
     logger = setup_root_logger()
+    phase_started = time.perf_counter()
     scenarios, base_params, context = load_scenario_inputs(
         spec,
         root=root,
     )
+    load_seconds = time.perf_counter() - phase_started
+    phase_started = time.perf_counter()
     bundles = build_bundles(
         scenarios,
         base_params,
         context,
         sample_size=sample_size,
     )
+    bundle_seconds = time.perf_counter() - phase_started
     cache_dir = horizon_cache_dir(root, spec)
+    scenario_fingerprints = None
+    fingerprint_seconds = 0.0
+    if resume:
+        phase_started = time.perf_counter()
+        code_digest = _simulation_code_digest(root)
+        scenario_fingerprints = {
+            bundle.scenario.name: scenario_cache_fingerprint(
+                bundle,
+                context,
+                code_digest=code_digest,
+            )
+            for bundle in bundles
+        }
+        fingerprint_seconds = time.perf_counter() - phase_started
+    logger.info(
+        "Preparation phases: load=%.2fs, sampling=%.2fs, fingerprint=%.2fs",
+        load_seconds,
+        bundle_seconds,
+        fingerprint_seconds,
+    )
+    phase_started = time.perf_counter()
     run_scenarios_in_batches(
         bundles=bundles,
         context=context,
@@ -135,9 +234,17 @@ def run_horizon(
         output_dir=cache_dir / "parquet",
         temp_dir=cache_dir / "temp" / "parquet_temp",
         batch_worker_function=worker_function_batch,
+        scenario_fingerprints=scenario_fingerprints,
+        max_parallel_scenarios=max_parallel_scenarios,
     )
+    runner_seconds = time.perf_counter() - phase_started
     path = horizon_results_path(root, spec)
     logger.info("Completed %s PSA: %s", spec.label, path)
+    logger.info(
+        "Horizon timing: runner=%.2fs, total=%.2fs",
+        runner_seconds,
+        time.perf_counter() - total_started,
+    )
     return path
 
 

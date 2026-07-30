@@ -4,7 +4,9 @@ from app.domain.rewards.vectorized import (
     _sample_zero_truncated_poisson,
     register_state_index,
     store_event_count,
+    store_weight,
 )
+from utils.math import cal_base_body_weight, cal_body_weight
 
 
 def test_vectorized_zero_truncated_poisson_is_strictly_positive():
@@ -58,3 +60,22 @@ def test_store_event_count_handles_all_states():
     assert result[states.index("hemarthrosis")] >= 1
     assert result[states.index("intracranial_hemorrhage")] == 1
     assert result[states.index("non_ich_major_bleeding")] == 1
+
+
+def test_precomputed_vectorized_weight_matches_scalar_weight():
+    week = 624
+    factors = np.array([0.81, 0.95, 1.0, 1.07, 1.23])
+    result = store_weight(
+        step=0,
+        state_idx=np.zeros(len(factors), dtype=np.int32),
+        store_arrays={},
+        shared_kwargs={
+            "per_iter": {"weight_factor": factors},
+            "base_weight_by_step": np.array([cal_base_body_weight(week)]),
+        },
+        rng=np.random.default_rng(1),
+    )
+    expected = np.array(
+        [cal_body_weight(week, weight_factor=float(factor)) for factor in factors]
+    )
+    assert np.allclose(result, expected, atol=1e-12, rtol=0.0)
