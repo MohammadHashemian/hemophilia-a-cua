@@ -25,7 +25,15 @@ class HorizonSpec:
         return (self.end_age - self.start_age) * 52
 
 
-CHILDHOOD = HorizonSpec(
+CHILDHOOD_1_12 = HorizonSpec(
+    key="childhood",
+    directory="childhood_age_1_12",
+    label="Childhood horizon (ages 1–12)",
+    start_age=1,
+    end_age=12,
+)
+
+CHILDHOOD_1_15 = HorizonSpec(
     key="childhood",
     directory="childhood_age_1_15",
     label="Childhood horizon (ages 1–15)",
@@ -34,19 +42,23 @@ CHILDHOOD = HorizonSpec(
 )
 LIFETIME = HorizonSpec(
     key="lifetime",
-    directory="lifetime_age_2_100",
-    label="Lifetime horizon (ages 2–100)",
-    start_age=2,
+    directory="lifetime_age_1_100",
+    label="Lifetime horizon (ages 1–100)",
+    start_age=1,
     end_age=100,
 )
 
 _HORIZONS = {
-    CHILDHOOD.key: CHILDHOOD,
-    CHILDHOOD.directory: CHILDHOOD,
-    "childhood_age_2_12": CHILDHOOD,  # legacy directory name
-    "early": CHILDHOOD,  # legacy scenario/cache name
+    CHILDHOOD_1_12.key: CHILDHOOD_1_12,
+    CHILDHOOD_1_12.directory: CHILDHOOD_1_12,
+    "childhood_age_1_12": CHILDHOOD_1_12,  # legacy directory name
+    CHILDHOOD_1_15.key: CHILDHOOD_1_15,
+    CHILDHOOD_1_15.directory: CHILDHOOD_1_15,
+    "childhood_age_2_12": CHILDHOOD_1_15,  # legacy directory name
+    "early": CHILDHOOD_1_15,  # legacy scenario/cache name
     LIFETIME.key: LIFETIME,
     LIFETIME.directory: LIFETIME,
+    "lifetime_age_2_100": LIFETIME,  # legacy directory name
 }
 
 

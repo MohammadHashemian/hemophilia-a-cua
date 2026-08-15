@@ -4,7 +4,7 @@ from pathlib import Path
 import numpy as np
 
 from app.notebook.psa.scenarios import (
-    CHILDHOOD,
+    CHILDHOOD_1_15,
     LIFETIME,
     build_psa_scenarios,
     get_horizon,
@@ -27,18 +27,22 @@ def _meta_samples(n: int = 10) -> dict:
 
 
 def test_horizon_specs_are_age_explicit():
-    assert CHILDHOOD.start_age == 1
-    assert CHILDHOOD.end_age == 15
-    assert CHILDHOOD.cycles == 14 * 52
-    assert LIFETIME.cycles == 98 * 52
-    assert get_horizon("early") is CHILDHOOD
-    assert get_horizon("childhood_age_2_12") is CHILDHOOD
-    assert get_horizon("childhood_age_1_15") is CHILDHOOD
+    assert CHILDHOOD_1_15.start_age == 1
+    assert CHILDHOOD_1_15.end_age == 15
+    assert CHILDHOOD_1_15.cycles == 14 * 52
+    assert LIFETIME.start_age == 1
+    assert LIFETIME.end_age == 100
+    assert LIFETIME.cycles == 99 * 52
+    assert get_horizon("early") is CHILDHOOD_1_15
+    assert get_horizon("childhood_age_2_12") is CHILDHOOD_1_15
+    assert get_horizon("childhood_age_1_15") is CHILDHOOD_1_15
+    assert get_horizon("lifetime_age_1_100") is LIFETIME
+    assert get_horizon("lifetime_age_2_100") is LIFETIME
 
 
 def test_each_horizon_builds_only_its_16_scenarios():
     context = ModelContext.load()
-    for horizon in (CHILDHOOD, LIFETIME):
+    for horizon in (CHILDHOOD_1_15, LIFETIME):
         scenarios = build_psa_scenarios(
             horizon,
             meta_samples=_meta_samples(),
@@ -56,7 +60,7 @@ def test_each_horizon_builds_only_its_16_scenarios():
 
 def test_new_psa_notebooks_are_valid_and_separated():
     notebooks_root = Path("app/notebooks/psa")
-    for horizon in (CHILDHOOD, LIFETIME):
+    for horizon in (CHILDHOOD_1_15, LIFETIME):
         folder = notebooks_root / horizon.directory
         files = sorted(folder.glob("*.ipynb"))
         assert [file.name for file in files] == [
@@ -70,7 +74,7 @@ def test_new_psa_notebooks_are_valid_and_separated():
             source = "\n".join(
                 "".join(cell.get("source", [])) for cell in notebook["cells"]
             )
-            other = LIFETIME if horizon is CHILDHOOD else CHILDHOOD
+            other = LIFETIME if horizon is CHILDHOOD_1_15 else CHILDHOOD_1_15
             assert horizon.directory in str(file)
             assert f"from app.notebook.psa import {horizon.key.upper()}" in source
             assert f"from app.notebook.psa import {other.key.upper()}" not in source

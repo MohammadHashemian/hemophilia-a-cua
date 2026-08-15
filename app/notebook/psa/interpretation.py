@@ -294,6 +294,13 @@ def figure_interpretation(
     bleeding = tables["Bleeding outcomes"]
     economic = tables["ICER and NMB"]
     narratives = {
+        "body_weight_curve": _narrative(
+            "The line is the deterministic age-specific base weight used for factor-dose "
+            "calculations. Markers report the exact assigned values at ages 1, 2, 12, "
+            "and 18; scenario weight factors scale this base curve multiplicatively.",
+            "Weight affects factor consumption and cost, but it does not directly alter "
+            "bleeding, mortality, or utility transitions in the current model.",
+        ),
         "abr_distribution": _narrative(
             f"The plotted sampled and simulated bleeding distributions correspond to "
             f"cohort ABRs ranging from {_range(bleeding, 'cohort_abr')}.",

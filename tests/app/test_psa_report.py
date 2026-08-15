@@ -13,7 +13,7 @@ from app.notebook.psa.economics import (
     economic_summary,
     paired_outcomes,
 )
-from app.notebook.psa.report_plots import health_state_distribution
+from app.notebook.psa.report_plots import body_weight_curve, health_state_distribution
 
 
 def _economic_frame() -> pl.DataFrame:
@@ -140,6 +140,21 @@ def test_health_state_distribution_includes_split_major_bleeding_states():
         "Death",
     ]
     plt.close(figure)
+
+
+def test_body_weight_curve_marks_requested_ages_for_both_horizons():
+    for horizon in ("childhood", "lifetime"):
+        figure = body_weight_curve(horizon)
+        axis = figure.axes[0]
+        annotations = {text.get_text() for text in axis.texts}
+        assert {
+            "Age 1: 9.03 kg",
+            "Age 2: 10.89 kg",
+            "Age 12: 40.34 kg",
+            "Age 18: 68.95 kg",
+        }.issubset(annotations)
+        assert axis.get_xlim()[0] == 1
+        plt.close(figure)
 
 
 def test_childhood_survival_uses_clearly_labelled_adaptive_zoom():

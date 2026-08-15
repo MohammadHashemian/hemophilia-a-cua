@@ -1,39 +1,125 @@
 {
-  "description": "Clinical and epidemiological inputs used by the simulation. Numerical values are unchanged; metadata records their provenance or assumption status.",
-  "reference": "See each input group's reference and the source/doi fields on individual ABR estimates.",
+  "description": "Clinical and epidemiological inputs used by the simulation.",
+  "reference": "Each input group's reference and the source/doi fields on individual ABR estimates.",
   "epidemiology": {
     "description": "Bleeding-event allocation, annual ICH incidence, and event-specific case-fatality inputs.",
     "reference": [
+      "World Bleeding Disorders Registry (WBDR) 2021 Data Report. Montreal: World Federation of Hemophilia; 2022. https://wfh.org/research-and-data-collection/world-bleeding-disorders-registry/",
       "World Federation of Hemophilia. World Bleeding Disorders Registry 2023 Data Report. https://www1.wfh.org/publications/files/pdf-2452.pdf",
       "Andersson NG et al. Br J Haematol. 2017. https://doi.org/10.1111/bjh.14844"
     ],
-    "event_fractions": {
-      "description": "AJBR fraction allocates total bleeds to joint bleeds. The non-ICH value is a proxy based on uncommon major anatomical bleeding sites, not a directly observed all-site probability.",
+    "patient_weight": {
+      "description": "Age-specific body weight used to calculate weight-based Factor VIII consumption. Patients enter the model at age 1 year. Weight is updated weekly using linear interpolation between annual reference points.",
+      "sex": "male",
+      "unit": "kg",
       "reference": [
-        "AJBR fraction: existing project assumption; original source is not documented and must be verified.",
-        "Non-ICH proxy: WFH World Bleeding Disorders Registry 2023 Data Report. https://www1.wfh.org/publications/files/pdf-2452.pdf",
-        "Supporting iliopsoas evidence: WFH World Bleeding Disorders Registry 2018 Data Report. https://elearning.wfh.org/wp-content/uploads/2019/05/WBDR_2018_Data_Report_EN.pdf"
+        "World Health Organization. WHO Child Growth Standards (2006)  https://www.who.int/publications/i/item/924154693X",
+        "WHO Child Growth Reference Data for 5-19 Years (2007) https://www.who.int/tools/growth-reference-data-for-5to19-years."
       ],
-      "ajbr_fraction": 0.75,
-      "non_ich_major_bleeding_fraction": 0.007455
+      "method": {
+        "ages_1_to_5": "Median (50th percentile) weight-for-age for boys from WHO Child Growth Standards 2006.",
+        "ages_6_to_10": "Median (50th percentile) weight-for-age for boys from WHO Growth Reference 2007.",
+        "ages_11_to_12": "Derived from WHO median height-for-age and BMI-for-age using Weight = BMI * Height^2.",
+        "weekly_interpolation": "linear",
+        "formula": "weight(age_weeks) = W_lower + ((age_weeks - age_lower_weeks) / (age_upper_weeks - age_lower_weeks)) * (W_upper - W_lower)"
+      },
+      "median_weight_by_age": {
+        "1": 9.6,
+        "2": 12.2,
+        "3": 14.3,
+        "4": 16.3,
+        "5": 18.3,
+        "6": 20.5,
+        "7": 22.9,
+        "8": 25.4,
+        "9": 28.1,
+        "10": 31.2,
+        "11": 34.6,
+        "12": 38.9
+      },
+      "derived_weights": {
+        "11": {
+          "height_cm": 143.1,
+          "bmi_kg_m2": 16.9,
+          "weight_kg": 34.6,
+          "formula": "16.9 * (1.431^2)"
+        },
+        "12": {
+          "height_cm": 149.1,
+          "bmi_kg_m2": 17.5,
+          "weight_kg": 38.9,
+          "formula": "17.5 * (1.491^2)"
+        }
+      }
     },
     "event_rates": {
       "description": "Annual ICH incidence rates by treatment regime; the model converts these rates to cycle probabilities.",
       "reference": "Andersson NG et al. Br J Haematol. 2017. https://doi.org/10.1111/bjh.14844",
       "intracranial_hemorrhage_rate": {
-        "description": "Central annual ICH-rate inputs. Verify the final numerator and person-time extraction when locking the calibration.",
-        "reference": [
-          "Andersson NG et al. Br J Haematol. 2017. https://doi.org/10.1111/bjh.14844",
-          "Andersson NG et al. Haematologica. 2025. https://doi.org/10.3324/haematol.2024.286909"
-        ],
-        "on_demand": 0.010,
-        "prophylaxis": 0.00033
+        "distribution": "gamma",
+        "on_demand": {
+          "mean": 0.017,
+          "sd": 0.0085,
+          "shape": 4.0,
+          "scale": 0.00425
+        },
+        "prophylaxis": {
+          "mean": 0.00033,
+          "sd": 0.000165,
+          "shape": 4.0,
+          "scale": 0.0000825
+        }
+      },
+      "non_ich_major_bleeding_rate": {
+        "method": "derived",
+        "formula": "ABR_sample * non_ich_major_bleeding_fraction_sample",
+        "central_values": {
+          "on_demand": 0.06458,
+          "prophylaxis": 0.01427
+        }
       }
     },
-    "ich_case_fatality_description": "Death conditional on ICH. The central value is approximately consistent with 2 deaths among 24 reported ICH events; uncertainty should be sampled in PSA.",
+    "event_fractions": {
+      "description": [
+        "Fraction allocates total bleeds to AJBR, ICH, and non-ICH major bleeding.",
+        "No-ICH major bleeds = GI + Neck/Throat"
+      ],
+      "reference": [
+        "AJBR fraction: World Federation of Hemophilia. World Bleeding Disorders Registry (WBDR) 2021 Data Report. Montreal: World Federation of Hemophilia; 2022. https://wfh.org/research-and-data-collection/world-bleeding-disorders-registry/",
+        "ICH and Non-ICH proxy: WFH World Bleeding Disorders Registry 2023 Data Report. https://www1.wfh.org/publications/files/pdf-2452.pdf",
+        "Supporting iliopsoas evidence: WFH World Bleeding Disorders Registry 2018 Data Report. https://elearning.wfh.org/wp-content/uploads/2019/05/WBDR_2018_Data_Report_EN.pdf"
+      ],
+      "ajbr_fraction": {
+        "distribution": "beta",
+        "mean": 0.76,
+        "sd": 0.03,
+        "alpha": 153.3,
+        "beta": 48.4
+      },
+      "intracranial_hemorrhage_fraction": {
+        "distribution": "beta",
+        "mean": 0.00113,
+        "sd": 0.0005,
+        "alpha": 7.07,
+        "beta": 5306.36
+      },
+      "non_ich_major_bleeding_fraction": {
+        "distribution": "beta",
+        "mean": 0.00468,
+        "sd": 0.001,
+        "alpha": 21.80,
+        "beta": 4636.24
+      }
+    },
+    "ich_case_fatality_description": "Death conditional on ICH. The central value is approximately consistent with 2 deaths among 24 reported ICH events;  Parameter uncertainty is represented using a Beta distribution derived from the observed deaths and survivors.",
     "ich_case_fatality_reference": "Andersson NG et al. Br J Haematol. 2017. https://doi.org/10.1111/bjh.14844",
-    "ich_case_fatality": 0.10,
-    "non_ich_case_fatality_description": "Structural base-case assumption of no immediate fatality from the aggregated non-ICH major-bleeding proxy; this is not a published estimate.",
+    "ich_case_fatality": {
+      "distribution": "beta",
+      "mean": 0.08333,
+      "alpha": 2,
+      "beta": 22
+    },
+    "non_ich_case_fatality_description": "Structural base-case assumption of no immediate fatality from the aggregated non-ICH major-bleeding proxy;",
     "non_ich_case_fatality_reference": "Modeling assumption caused by insufficient subtype-specific evidence; vary in sensitivity analysis.",
     "non_ich_case_fatality": 0.0
   },
@@ -94,6 +180,30 @@
   "evidence": {
     "description": "Published ABR evidence used to parameterize treatment-regime distributions.",
     "reference": "Each study estimate records its row-level source and DOI.",
+    "abr_range": {
+      "description": "Reported ABR median range from the systematic review by J. O’Hara1 et al. (2018). The model does not use these values directly; they are provided for context to sample the ABR distribution in PSA.",
+      "reference": "O’Hara J et al 2018; https://doi.org/10.1111/hae.13546",
+      "on_demand": {
+        "min": 2.1,
+        "max": 4.0
+      },
+      "prophylaxis": {
+        "min": 12.0,
+        "max": 15.6
+      }
+    },
+    "ajbr_range": {
+      "description": "Reported AJBR median range from the systematic review by J. O’Hara1 et al. (2018). The model does not use these values directly; they are provided for context to sample the AJBR distribution in PSA.",
+      "reference": "O’Hara J et al 2018; https://doi.org/10.1111/hae.13546",
+      "on_demand": {
+        "min": 1.0,
+        "max": 1.1
+      },
+      "prophylaxis": {
+        "min": 5.5,
+        "max": 14.2
+      }
+    },
     "abr": {
       "description": "Study-level ABR mean, dispersion, and sample-size inputs separated by treatment regime.",
       "reference": "The source and doi fields on every estimate are its direct bibliographic reference.",
@@ -118,7 +228,8 @@
           "sd": 19.9,
           "source": "Manco-Johnson MJ et al.",
           "size": "84",
-          "doi": "10.1111/jth.13811"
+          "doi": "10.1111/jth.13811",
+          "description": "SPINART 3-year outcomes"
         },
         {
           "mean": 19.5,

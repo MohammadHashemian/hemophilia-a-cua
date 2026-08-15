@@ -6,6 +6,9 @@ docs/
 *.egg-info/
 /__pycache__
 */__pycache__
+/tmp/
+.codex_tmp/
+.tmp/
 .pytest_cache
 .pytest_tmp*/
 .conda

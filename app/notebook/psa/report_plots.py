@@ -19,6 +19,7 @@ from app.notebook.psa.economics import (
 )
 from app.notebook.psa.scenarios import HorizonSpec, get_horizon
 from app.notebook.psa.tables import state_occupation
+from utils.math import cal_body_weight
 
 
 def _plot_sample(frame: pl.DataFrame, maximum: int = 3_000) -> pl.DataFrame:
@@ -30,6 +31,85 @@ def _plot_sample(frame: pl.DataFrame, maximum: int = 3_000) -> pl.DataFrame:
 
 def _methods(df: pl.DataFrame) -> list[str]:
     return sorted(base_results(df)["sampling_method"].unique().to_list())
+
+
+def body_weight_curve(
+    horizon: str | HorizonSpec,
+) -> plt.Figure:  # type: ignore
+    """Plot the deterministic base-weight curve used by simulation workers."""
+    spec = get_horizon(horizon)
+    milestone_ages = (1, 2, 12, 18)
+    display_end_age = max(spec.end_age, max(milestone_ages))
+    ages = np.arange(spec.start_age * 52, display_end_age * 52 + 1) / 52
+    weights = np.array(
+        [cal_body_weight(int(round(age * 52))) for age in ages],
+        dtype=float,
+    )
+
+    fig, ax = plt.subplots(figsize=(11, 6))
+    ax.plot(
+        ages,
+        weights,
+        color="#2563EB",
+        linewidth=2.4,
+        label="Base-case male body weight",
+        zorder=2,
+    )
+    if spec.end_age < display_end_age:
+        ax.axvspan(
+            spec.end_age,
+            display_end_age,
+            color="#94A3B8",
+            alpha=0.14,
+            label="Outside simulation horizon",
+            zorder=0,
+        )
+
+    annotation_offsets = {
+        1: (10, 18),
+        2: (42, -22),
+        12: (-22, 18),
+        18: (-112, -18),
+    }
+    for age in milestone_ages:
+        value = cal_body_weight(age * 52)
+        ax.scatter(
+            age,
+            value,
+            s=58,
+            color="#F59E0B",
+            edgecolor="#78350F",
+            linewidth=1.2,
+            zorder=4,
+        )
+        ax.annotate(
+            f"Age {age}: {value:.2f} kg",
+            xy=(age, value),
+            xytext=annotation_offsets[age],
+            textcoords="offset points",
+            fontsize=9,
+            fontweight="semibold",
+            arrowprops={"arrowstyle": "-", "color": "#64748B", "lw": 0.9},
+            bbox={
+                "boxstyle": "round,pad=0.25",
+                "facecolor": ax.get_facecolor(),
+                "edgecolor": "#94A3B8",
+                "alpha": 0.92,
+            },
+            zorder=5,
+        )
+
+    ax.set(
+        title=f"Patient body-weight trajectory — {spec.label}",
+        xlabel="Age (years)",
+        ylabel="Assigned body weight (kg)",
+        xlim=(spec.start_age, display_end_age),
+    )
+    ax.margins(y=0.12)
+    ax.grid(alpha=0.25)
+    ax.legend(frameon=False)
+    fig.tight_layout()
+    return fig
 
 
 def abr_distribution(
@@ -493,6 +573,7 @@ def all_figures(
 ) -> dict[str, plt.Figure]:  # type: ignore
     survival, _ = plot_survival(df, horizon)
     return {
+        "body_weight_curve": body_weight_curve(horizon),
         "abr_distribution": abr_distribution(df, horizon),
         "survival_curve": survival,
         "health_state_distribution": health_state_distribution(df, horizon),

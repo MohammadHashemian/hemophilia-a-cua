@@ -73,8 +73,9 @@ def cal_body_weight(
       - 2 y: ~11   6 y: ~21   10 y: ~33   12 y: ~40   14 y: ~50
       - 18 y: ~69  25 y: ~83  40-55 y: ~88 (peak)     80+ y: ~85
 
-    Patients enter the model at age 2, so the curve is only ever
-    evaluated for weeks >= 104, where its absolute error vs. the
+    Patients enter the current childhood and lifetime models at age 1, so the
+    curve is evaluated from week 52 onward. Across the principal childhood
+    milestones, its absolute error vs. the
     reference medians is typically <= 3%.
 
     Args:

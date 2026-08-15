@@ -14,22 +14,22 @@ Results are written to:
 
 `app/cache/psa/childhood_age_1_15/parquet/all_results_combined.parquet`
 
-## Lifetime horizon (ages 2–100)
+## Lifetime horizon (ages 1–100)
 
 Run in order:
 
-1. `lifetime_age_2_100/01_scenario_definitions.ipynb`
-2. `lifetime_age_2_100/02_simulation.ipynb`
-3. `lifetime_age_2_100/03_analysis.ipynb`
+1. `lifetime_age_1_100/01_scenario_definitions.ipynb`
+2. `lifetime_age_1_100/02_simulation.ipynb`
+3. `lifetime_age_1_100/03_analysis.ipynb`
 
 Results are written to:
 
-`app/cache/psa/lifetime_age_2_100/parquet/all_results_combined.parquet`
+`app/cache/psa/lifetime_age_1_100/parquet/all_results_combined.parquet`
 
-The lifetime analysis temporarily supports the previous mixed PSA cache as a
-read-only migration fallback. The old childhood cache covered ages 2–12 and is
-intentionally rejected; run the ages 1–15 childhood simulation before its
-analysis notebook.
+The old childhood cache covered ages 2–12 and the old lifetime cache covered
+ages 2–100. Both are intentionally rejected. Run the current horizon's
+simulation before its analysis notebook so age-2 results cannot be mistaken for
+the current age-1 cohorts.
 
 The legacy combined notebooks are retained for reference under:
 

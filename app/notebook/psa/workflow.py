@@ -103,7 +103,10 @@ def build_bundles(
             field_rng = np.random.default_rng(field_seed)
             raw[field] = getattr(scenario_params, field).sample(sample_size, field_rng)
         resolved = ParameterResolver.resolve_samples(raw)
-        inputs = [ParameterResolver.build_single(resolved, index) for index in range(sample_size)]
+        inputs = [
+            ParameterResolver.build_single(resolved, index)
+            for index in range(sample_size)
+        ]
         bundles.append(ScenarioBundle(scenario=scenario, inputs=inputs))
     return bundles
 
@@ -170,7 +173,9 @@ def scenario_cache_fingerprint(
             value = getattr(model_input, field.name)
             # Optional fields exist only for backward-compatible construction;
             # production resolver output always supplies JSON-derived values.
-            digest.update(b"<none>" if value is None else struct.pack("!d", float(value)))
+            digest.update(
+                b"<none>" if value is None else struct.pack("!d", float(value))
+            )
     return digest.hexdigest()
 
 
@@ -253,13 +258,10 @@ def load_horizon_results(horizon: str | HorizonSpec) -> pl.DataFrame:
     if path.exists():
         return pl.read_parquet(path)
 
-    # Migration path: permit the new analysis notebooks to read the legacy
-    # mixed cache until each separated simulation has been run once.
-    legacy = root / "app" / "cache" / "psa" / "parquet" / "all_results_combined.parquet"
-    # The legacy childhood results covered ages 2–12 and are not compatible
-    # with the current ages 1–15 definition. Lifetime remains unchanged and
-    # can safely use its legacy rows during migration.
-    if legacy.exists() and spec.key == "lifetime":
-        return pl.read_parquet(legacy).filter(pl.col("time_horizon") == spec.key)
-
-    raise FileNotFoundError(f"No results at {path}. Run this horizon's 02_simulation.ipynb first.")
+    # Legacy childhood (ages 2–12) and lifetime (ages 2–100) caches are not
+    # compatible with the current age-1 cohort definitions. Never silently
+    # substitute them: both horizons require their own current simulation.
+    raise FileNotFoundError(
+        f"No current results at {path}. Run this horizon's "
+        "02_simulation.ipynb first. Legacy age-2 caches are intentionally ignored."
+    )

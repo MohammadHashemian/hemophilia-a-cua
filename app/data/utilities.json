@@ -1,132 +1,666 @@
 {
-  "description": "Health-state utilities used to calculate QALYs. Chronic utility is selected by Pettersson score; an acute event temporarily uses the lower of the chronic and acute-event utilities.",
-  "reference": [
-    "ICER. Valoctocogene Roxaparvovec and Emicizumab for Hemophilia A: Effectiveness and Value. 2020.",
-    "Fischer K et al. The association of haemophilic arthropathy with health-related quality of life. Haemophilia. 2016;22(6):833-840. doi:10.1111/hae.13120.",
-    "Cohan D et al. Modeling Benefits, Costs, and Affordability of a Novel Gene Therapy in Hemophilia A. J Med Econ. 2022;25(1):182-193. doi:10.1080/13696998.2022.2033050."
-  ],
-  "pettersson_utility_thresholds": {
-    "description": "Inclusive lower bounds for the evidence-defined utility bands. PS 0 uses healthy; 1-4 early; 5-12 moderate; 13-21 severe; 22-39 advanced; and 40-79 end-stage.",
-    "reference": "Fischer et al. 2016 (doi:10.1111/hae.13120); PS 0 is separated using ICER/O'Hara evidence.",
-    "early_arthropathy": 1,
-    "moderate_arthropathy": 5,
-    "severe_arthropathy": 13,
-    "advanced_arthropathy": 22,
-    "end_stage_arthropathy": 40
-  },
-  "state_utilities": {
-    "description": "PS 0 is separated from early radiographic arthropathy so that a young, bleed-free patient on effective prophylaxis is not artificially capped at 0.82.",
-    "reference": "See the citation and interpretation stored with each utility.",
-    "healthy": {
-      "mean": 0.94,
-      "description": "No established radiographic arthropathy: Pettersson score exactly 0. Intended for the young starting cohort. Acute bleeds are applied separately.",
-      "reference": "ICER 2020, Table of health-state utilities: age 0-30 and Pettersson score 0 = 0.94, based on O'Hara et al. 2018 (doi:10.1186/s12955-018-0908-9).",
-      "uncertainty": {
-        "distribution": "triangular",
-        "low": 0.82,
-        "high": 1.0,
-        "description": "Plausible range used for PSA; 0.82 is the ICER value for young patients with PS 1-27 and 1.00 is the utility ceiling."
-      }
+  "utilities": {
+    "model_status": "implementation_ready",
+    "version": "1.0",
+    "population": "boys aged 1-12 years with severe hemophilia A without FVIII inhibitors",
+    "model_type": "individual-level weekly microsimulation",
+    "cycle_length_weeks": 1,
+    "cycles_per_model_year": 52,
+    "description": "Common utility parameters are used for both strategies. Treatment-specific QALY differences arise only through different simulated clinical histories (bleeding, Pettersson progression, ICH sequelae, and death).",
+    "utility_bounds": {
+      "minimum": 0.0,
+      "maximum": 1.0,
+      "death": 0.0
     },
-    "mild_arthropathy": {
-      "mean": 0.82,
-      "description": "Early radiographic arthropathy: Pettersson score 1-4.",
-      "reference": "Fischer et al. 2016 (doi:10.1111/hae.13120), reported for PS 0-4; PS 0 is separated in this model using ICER/O'Hara evidence.",
-      "uncertainty": {
-        "distribution": "beta_from_mean_sd",
-        "sd": 0.13,
-        "description": "Published standard deviation for the PS 0-4 group."
-      }
-    },
-    "moderate_arthropathy": {
-      "mean": 0.81,
-      "description": "Pettersson score 5-12.",
-      "reference": "Fischer et al. 2016 (doi:10.1111/hae.13120), as implemented in published haemophilia economic models.",
-      "uncertainty": {
-        "distribution": "beta_from_mean_sd",
-        "sd": 0.12
-      }
-    },
-    "severe_arthropathy": {
-      "mean": 0.77,
-      "description": "Pettersson score 13-21.",
-      "reference": "Fischer et al. 2016 (doi:10.1111/hae.13120), as implemented in published haemophilia economic models.",
-      "uncertainty": {
-        "distribution": "beta_from_mean_sd",
-        "sd": 0.13
-      }
-    },
-    "advanced_arthropathy": {
-      "mean": 0.74,
-      "description": "Pettersson score 22-39.",
-      "reference": "Fischer et al. 2016 (doi:10.1111/hae.13120), as implemented in published haemophilia economic models.",
-      "uncertainty": {
-        "distribution": "beta_from_mean_sd",
-        "sd": 0.12
-      }
-    },
-    "end_stage_arthropathy": {
-      "mean": 0.72,
-      "description": "Pettersson score 40-78; score 79 is capped into this final model band.",
-      "reference": "Fischer et al. 2016 (doi:10.1111/hae.13120), as implemented in published haemophilia economic models.",
-      "uncertainty": {
-        "distribution": "beta_from_mean_sd",
-        "sd": 0.11
-      }
-    },
-    "bleeding": {
-      "mean": 0.66,
-      "description": "Temporary utility during a treated non-target-joint bleed.",
-      "reference": "Neufeld EJ et al. Effect of acute bleeding on daily quality of life assessments in patients with congenital hemophilia with inhibitors. Value Health. 2012;15(6):916-925. doi:10.1016/j.jval.2012.05.005; uncertainty bounds follow Cohan et al. 2022.",
-      "uncertainty": {
-        "distribution": "triangular",
-        "low": 0.53,
-        "high": 0.79
-      }
-    },
-    "hemarthrosis": {
-      "mean": 0.54,
-      "description": "Temporary utility during a treated target-joint bleed/hemarthrosis.",
-      "reference": "Mazza G et al. Value Health. 2016;19(7):A608. doi:10.1016/j.jval.2016.09.1420; implemented as 0.66 non-target bleed utility minus 0.12 target-joint decrement in Cohan et al. 2022.",
-      "uncertainty": {
-        "distribution": "triangular",
-        "low": 0.42,
-        "high": 0.66,
-        "description": "Symmetric plausible range around the modelled 0.54 estimate; tested because the source is a conference abstract and the value is derived."
-      }
-    },
-    "intracranial_hemorrhage": {
-      "mean": 0.15,
-      "description": "Utility for a major nonfatal intracranial hemorrhage. The current simulation applies it during the acute ICH state week only.",
-      "reference": "Hogg K et al. Preferences for treatments to prevent venous thromboembolism after total hip or knee arthroplasty. JAMA Intern Med. 2013;173(8):612-620. doi:10.1001/jamainternmed.2013.563.",
-      "uncertainty": {
-        "distribution": "triangular",
-        "low": 0.0,
-        "high": 0.65,
-        "description": "Published median 0.15 and IQR 0.00-0.65; represented approximately as a triangular PSA distribution."
-      }
-    },
-    "non_ich_major_bleeding": {
-      "mean": 0.55,
-      "description": "Temporary utility during an acute non-ICH major bleed.",
-      "reference": [
-        "Hogg K et al. JAMA Intern Med. 2013;173(8):612-620. doi:10.1001/jamainternmed.2013.563: standard-gamble utility approximately 0.65 for one week of gastrointestinal bleeding.",
-        "National Clinical Guideline Centre. Acute Upper Gastrointestinal Bleeding: Management. NICE Clinical Guideline 141, full guideline, 2012: economic analysis used utility 0.45 while hospitalized and 0.78 at home. https://www.nice.org.uk/guidance/cg141/evidence/full-guideline-pdf-186534541",
-        "Base case 0.55 is the prespecified midpoint between these two estimates."
+    "baseline_pediatric_utility": {
+      "parameter_id": "u_pediatric_anchor",
+      "base_case": 0.952,
+      "common_to_strategies": true,
+      "role": "common_pediatric_high_functioning_anchor",
+      "applies_at_model_entry": true,
+      "base_case_pettersson_range": [
+        0,
+        12
       ],
-      "uncertainty": {
-        "distribution": "triangular",
-        "low": 0.45,
-        "high": 0.65,
-        "description": "Evidence-bracketing triangular distribution with mode 0.55."
+      "interpretation": "0.952 is not a directly observed PS=0 utility and is not a treatment-specific prophylaxis benefit. It is used as a common pediatric absolute utility anchor.",
+      "reference": {
+        "citation": "Zhang L, Zhang P, Chen W. Treatment regimens, patient reported outcomes and health-related quality of life in children with moderate and severe hemophilia A in China: using real-world data. Orphanet J Rare Dis. 2023;18:232. doi:10.1186/s13023-023-02835-x.",
+        "population": "373 boys aged <=18 years with moderate or severe hemophilia A without FVIII inhibitors; mean age 7.3 years; 69.7% severe.",
+        "instrument": "EQ-5D-5L, Chinese population value set",
+        "source_group": "long-term prophylaxis",
+        "n": 18,
+        "mean": 0.952,
+        "sd": 0.125,
+        "limitations": [
+          "The source group contained both moderate and severe hemophilia A.",
+          "The source group was treatment-defined, not Pettersson-defined.",
+          "Mean annual bleeds were 9.8 and mean target joints were 0.3; therefore the value is not interpreted as perfect health or PS=0."
+        ]
+      },
+      "psa": {
+        "distribution": "beta",
+        "uncertainty_target": "sampling uncertainty in the source-group mean",
+        "mean": 0.952,
+        "reported_individual_sd": 0.125,
+        "n": 18,
+        "standard_error": 0.029462783,
+        "alpha": 49.162986,
+        "beta": 2.478806,
+        "sample_once_per_psa_iteration": true,
+        "shared_between_strategies": true
       }
     },
-    "death": {
-      "mean": 0.0,
-      "description": "Death.",
-      "reference": "Conventional QALY anchor.",
-      "uncertainty": {
-        "distribution": "constant"
+    "fischer_arthropathy_evidence": {
+      "reference": {
+        "citation": "Fischer K, de Kleijn P, Negrier C, et al. The association of haemophilic arthropathy with Health-Related Quality of Life: a post hoc analysis. Haemophilia. 2016;22(6):833-840. doi:10.1111/hae.13120.",
+        "population": "176 assessments in 159 patients with moderate/severe hemophilia A or B; minimum age 16 years; median age 26.6 years; 89.9% severe; 84.7% hemophilia A.",
+        "instrument": "SF-6D utility derived from SF-36",
+        "pettersson_total_range": [
+          0,
+          78
+        ],
+        "key_interpretation": "Observed mean utility declined from 0.80 in PS 0-4 and 5-12 to 0.77 in PS 13-21 and 0.70 in PS 22-39. The 0.03 decrement at PS 13-21 was below the reported SF-6D MID of 0.041 and was not statistically significant; significant deterioration was concentrated above PS 21. No additional significant decline was observed for PS 40-78."
+      },
+      "observed_groups": {
+        "ps_0_4": {
+          "pettersson_range": [
+            0,
+            4
+          ],
+          "mean": 0.80,
+          "sd": 0.13,
+          "median": 0.83,
+          "iqr": [
+            0.68,
+            0.90
+          ],
+          "n": 33,
+          "standard_error": 0.022630095,
+          "psa_mean_distribution": {
+            "distribution": "beta",
+            "alpha": 249.140828,
+            "beta": 62.285207
+          }
+        },
+        "ps_5_12": {
+          "pettersson_range": [
+            5,
+            12
+          ],
+          "mean": 0.80,
+          "sd": 0.12,
+          "median": 0.83,
+          "iqr": [
+            0.74,
+            0.89
+          ],
+          "n": 35,
+          "standard_error": 0.020283702,
+          "psa_mean_distribution": {
+            "distribution": "beta",
+            "alpha": 310.311111,
+            "beta": 77.577778
+          }
+        },
+        "ps_13_21": {
+          "pettersson_range": [
+            13,
+            21
+          ],
+          "mean": 0.77,
+          "sd": 0.13,
+          "median": 0.79,
+          "iqr": [
+            0.70,
+            0.83
+          ],
+          "n": 36,
+          "standard_error": 0.021666667,
+          "psa_mean_distribution": {
+            "distribution": "beta",
+            "alpha": 289.715917,
+            "beta": 86.538521
+          }
+        },
+        "ps_22_39": {
+          "pettersson_range": [
+            22,
+            39
+          ],
+          "mean": 0.70,
+          "sd": 0.12,
+          "median": 0.73,
+          "iqr": [
+            0.60,
+            0.82
+          ],
+          "n": 37,
+          "standard_error": 0.019727878,
+          "psa_mean_distribution": {
+            "distribution": "beta",
+            "alpha": 377.008333,
+            "beta": 161.575
+          }
+        },
+        "ps_40_78": {
+          "pettersson_range": [
+            40,
+            78
+          ],
+          "mean": 0.71,
+          "sd": 0.11,
+          "median": 0.72,
+          "iqr": [
+            0.60,
+            0.81
+          ],
+          "n": 35,
+          "standard_error": 0.018593394,
+          "psa_mean_distribution": {
+            "distribution": "beta",
+            "alpha": 422.150744,
+            "beta": 172.427769
+          },
+          "note": "The slightly higher mean than PS 22-39 is not allowed to create increasing utility with worsening arthropathy."
+        }
+      }
+    },
+    "chronic_arthropathy_utility_mapping": {
+      "mapping_type": "pediatric_anchor_times_fischer_relative_factor",
+      "base_case_principle": "Use the observed Fischer relative utility pattern rather than adult absolute SF-6D values. The PS 13-21 observed mean effect is retained in the base case despite being below the MID; a threshold-based no-decrement alternative is tested structurally.",
+      "reference_group": {
+        "pettersson_range": [
+          0,
+          12
+        ],
+        "deterministic_fischer_mean": 0.80,
+        "psa_formula": "U_ref = (33*U_PS0_4 + 35*U_PS5_12)/68"
+      },
+      "states": {
+        "no_or_minimal_arthropathy": {
+          "pettersson_range": [
+            0,
+            12
+          ],
+          "base_case_relative_factor": 1.0,
+          "base_case_utility": 0.952,
+          "formula": "U_state = U_pediatric_anchor"
+        },
+        "mild_arthropathy": {
+          "pettersson_range": [
+            13,
+            21
+          ],
+          "base_case_relative_factor": 0.9625,
+          "base_case_utility": 0.9163,
+          "formula": "U_state = U_pediatric_anchor * (0.77/0.80)"
+        },
+        "moderate_arthropathy": {
+          "pettersson_range": [
+            22,
+            39
+          ],
+          "base_case_relative_factor": 0.875,
+          "base_case_utility": 0.833,
+          "formula": "U_state = U_pediatric_anchor * (0.70/0.80)"
+        },
+        "severe_arthropathy": {
+          "pettersson_range": [
+            40,
+            78
+          ],
+          "raw_fischer_relative_factor": 0.8875,
+          "base_case_relative_factor_after_monotonicity": 0.875,
+          "base_case_utility": 0.833,
+          "formula": "U_state = min(U_moderate, U_pediatric_anchor * (0.71/0.80))"
+        },
+        "death": {
+          "utility": 0.0
+        }
+      },
+      "psa_formulas": {
+        "reference": "U_ref = max(epsilon, (33*sampled_U_PS0_4 + 35*sampled_U_PS5_12)/68)",
+        "no_or_minimal": "U0 = sampled_U_pediatric_anchor",
+        "mild_raw": "U1_raw = sampled_U_pediatric_anchor * min(1, sampled_U_PS13_21/U_ref)",
+        "mild_final": "U1 = min(U0, U1_raw)",
+        "moderate_raw": "U2_raw = sampled_U_pediatric_anchor * min(1, sampled_U_PS22_39/U_ref)",
+        "moderate_final": "U2 = min(U1, U2_raw)",
+        "severe_raw": "U3_raw = sampled_U_pediatric_anchor * min(1, sampled_U_PS40_78/U_ref)",
+        "severe_final": "U3 = min(U2, U3_raw)",
+        "epsilon": 1e-9
+      },
+      "structural_sensitivity_scenarios": {
+        "threshold_based_no_mild_decrement": {
+          "description": "Reflect Fischer's finding that significant deterioration was concentrated above PS 21.",
+          "state_utilities_deterministic": {
+            "ps_0_12": 0.952,
+            "ps_13_21": 0.952,
+            "ps_22_39": 0.833,
+            "ps_40_78": 0.833
+          }
+        },
+        "direct_absolute_fischer_mapping": {
+          "description": "Use adult Fischer SF-6D utilities directly to test the pediatric anchoring assumption.",
+          "state_utilities": {
+            "ps_0_12": 0.80,
+            "ps_13_21": 0.77,
+            "ps_22_39": 0.70,
+            "ps_40_78": 0.70
+          }
+        }
+      }
+    },
+    "shared_minor_bleed_acute_parameters": {
+      "applies_to": [
+        "non_major_non_joint_bleed",
+        "joint_bleed"
+      ],
+      "utility_decrement": {
+        "parameter_id": "du_minor_bleed_day",
+        "base_case": 0.16,
+        "reference": {
+          "citation": "Neufeld EJ, Recht M, Sabio H, et al. Effect of acute bleeding on daily quality of life assessments in patients with congenital hemophilia with inhibitors and their families. Value Health. 2012;15(6):916-925. doi:10.1016/j.jval.2012.05.005.",
+          "overall_evidence": "Mean EQ-5D index 0.66 on bleed days versus 0.82 on nonbleed days; difference 0.16.",
+          "pediatric_support": "Patient-mean EQ-5D in age <=18 years was 0.76 on bleed days versus 0.92 on nonbleed days; difference 0.16.",
+          "bleed_type_support": "Joint and other bleed types showed comparable acute QOL deviations in the study.",
+          "population_limitation": "Congenital hemophilia with inhibitors; used as indirect daily bleed-effect evidence for inhibitor-negative severe HA."
+        },
+        "psa": {
+          "distribution": "triangular",
+          "low": 0.128,
+          "mode": 0.16,
+          "high": 0.192,
+          "uncertainty_type": "pragmatic second-order modeling range",
+          "note": "The +/-20% range is not a reported CI or SD.",
+          "sample_once_per_psa_iteration": true,
+          "shared_between_strategies": true,
+          "shared_between_joint_and_nonjoint": true
+        }
+      },
+      "duration_days": {
+        "parameter_id": "duration_minor_bleed_days",
+        "base_case": 2.0,
+        "psa": {
+          "distribution": "triangular",
+          "low": 1.0,
+          "mode": 2.0,
+          "high": 3.0,
+          "uncertainty_target": "mean acute-burden duration per minor bleed",
+          "uncertainty_type": "evidence-informed modeling assumption",
+          "sample_once_per_psa_iteration": true,
+          "shared_between_strategies": true,
+          "shared_between_joint_and_nonjoint": true
+        },
+        "interpretation": "The same base-case acute duration is used for joint and non-major non-joint bleeds because direct comparative utility-duration evidence is lacking. Joint bleeds remain distinct because each joint bleed updates cumulative joint-bleed history and future Pettersson progression.",
+        "duration_evidence": [
+          {
+            "citation": "Manco-Johnson MJ, et al. Prophylaxis versus Episodic Treatment to Prevent Joint Disease in Boys with Severe Hemophilia. N Engl J Med. 2007;357:535-544. doi:10.1056/NEJMoa067659.",
+            "evidence": "Enhanced episodic treatment of hemarthrosis included dosing at recognition, 24 h and 72 h, with continued every-other-day dosing permitted until pain and impaired mobility resolved."
+          },
+          {
+            "citation": "Gringeri A, et al. A randomized clinical trial of prophylaxis in children with hemophilia A (the ESPRIT Study). J Thromb Haemost. 2011;9:700-710. doi:10.1111/j.1538-7836.2011.04214.x.",
+            "evidence": "Children aged 1-7 years on episodic therapy received FVIII every 12-24 h until complete clinical bleeding resolution."
+          },
+          {
+            "citation": "Young G, et al. Recombinant factor VIII Fc fusion protein for the prevention and treatment of bleeding in children with severe hemophilia A. J Thromb Haemost. 2015;13:967-977. doi:10.1111/jth.12911.",
+            "evidence": "In children <12 years with severe HA, 93% of bleeding episodes were controlled with one or two rFVIIIFc infusions."
+          }
+        ],
+        "structural_sensitivity": {
+          "differential_duration": {
+            "non_major_non_joint_bleed_days": 1,
+            "joint_bleed_days": 3,
+            "purpose": "Tests the possibility that joint bleeds have longer acute burden than non-joint minor bleeds."
+          }
+        }
+      }
+    },
+    "acute_event_utilities": {
+      "non_major_non_joint_bleed": {
+        "effect_type": "temporary_decrement",
+        "decrement_parameter_id": "du_minor_bleed_day",
+        "duration_parameter_id": "duration_minor_bleed_days",
+        "formula": "U_event = max(0, U_effective_chronic - sampled_du_minor_bleed_day)",
+        "long_term_state_update": "none"
+      },
+      "joint_bleed": {
+        "effect_type": "temporary_decrement_plus_arthropathy_history_update",
+        "decrement_parameter_id": "du_minor_bleed_day",
+        "duration_parameter_id": "duration_minor_bleed_days",
+        "formula": "U_event = max(0, U_effective_chronic - sampled_du_minor_bleed_day)",
+        "long_term_state_update": {
+          "cumulative_joint_bleeds_increment_per_event": 1,
+          "pettersson_update": "Apply the separate model rule linking cumulative joint bleeds to Pettersson score."
+        },
+        "alternative_published_model_scenario": {
+          "utility_cap": 0.54,
+          "reference": {
+            "citation": "Cook K, Forbes SP, Adamski K, Ma JJ, Chawla A, Garrison LP Jr. Assessing the potential cost-effectiveness of a gene therapy for the treatment of hemophilia A. J Med Econ. 2020;23(5):501-512. doi:10.1080/13696998.2020.1721508."
+          },
+          "reason_not_base_case": "May overlap with separately modeled chronic Pettersson-mediated joint burden."
+        }
+      },
+      "non_ich_major_bleeding": {
+        "scope": "major extracranial bleeding; base-case proxy is nonfatal GI bleeding",
+        "effect_type": "temporary_utility_cap",
+        "utility_cap": {
+          "parameter_id": "u_nonich_major_bleed_cap",
+          "base_case": 0.65,
+          "reference": {
+            "citation": "Hogg K, Kimpton M, Carrier M, Coyle D, Forgie M, Wells P. Estimating Quality of Life in Acute Venous Thrombosis. JAMA Intern Med. 2013;173(12):1067-1072. doi:10.1001/jamainternmed.2013.563.",
+            "health_state": "nonfatal gastrointestinal tract bleeding",
+            "elicitation_method": "standard gamble",
+            "reported_median": 0.65,
+            "reported_iqr": [
+              0.15,
+              0.86
+            ],
+            "source_duration": "1 week",
+            "duration_basis_in_source": "expert consensus for bleeding health states",
+            "population_limitation": "Adult thrombosis-clinic population; not pediatric and not hemophilia-specific."
+          },
+          "psa": {
+            "distribution": "triangular",
+            "low": 0.15,
+            "mode": 0.65,
+            "high": 0.86,
+            "uncertainty_type": "pragmatic IQR-bracketing second-order distribution",
+            "note": "IQR endpoints are not empirical minimum and maximum.",
+            "sample_once_per_psa_iteration": true,
+            "shared_between_strategies": true
+          }
+        },
+        "duration_days": {
+          "parameter_id": "duration_nonich_major_bleed_days",
+          "base_case": 7.0,
+          "psa": {
+            "distribution": "triangular",
+            "low": 5.0,
+            "mode": 7.0,
+            "high": 10.0,
+            "uncertainty_type": "pragmatic modeling range around Hogg's 1-week health-state duration",
+            "sample_once_per_psa_iteration": true,
+            "shared_between_strategies": true
+          },
+          "clinical_reference": {
+            "citation": "Srivastava A, Santagostino E, Dougall A, et al. WFH Guidelines for the Management of Hemophilia, 3rd edition. Haemophilia. 2020;26(Suppl 6):1-158. doi:10.1111/hae.14046.",
+            "relevance": "WFH states that treatment amount and duration depend on bleed site/severity; GI and throat/neck bleeds require continued hemostatic coverage until bleeding/symptoms resolve."
+          }
+        },
+        "formula": "U_event = min(U_effective_chronic, sampled_u_nonich_major_bleed_cap)"
+      },
+      "intracranial_hemorrhage_acute": {
+        "effect_type": "temporary_utility_cap",
+        "utility_cap": {
+          "parameter_id": "u_acute_ich_cap",
+          "base_case": 0.15,
+          "reference": {
+            "citation": "Hogg K, Kimpton M, Carrier M, Coyle D, Forgie M, Wells P. Estimating Quality of Life in Acute Venous Thrombosis. JAMA Intern Med. 2013;173(12):1067-1072. doi:10.1001/jamainternmed.2013.563.",
+            "health_state": "nonfatal major intracranial bleeding event",
+            "elicitation_method": "standard gamble",
+            "reported_median": 0.15,
+            "reported_iqr": [
+              0.00,
+              0.65
+            ],
+            "source_duration": "permanent",
+            "population_limitation": "Adult thrombosis-clinic population; not pediatric and not hemophilia-specific.",
+            "modeling_interpretation": "Used only as a proxy for acute ICH severity; persistent consequences are modeled separately."
+          },
+          "psa": {
+            "distribution": "triangular",
+            "low": 0.00,
+            "mode": 0.15,
+            "high": 0.65,
+            "uncertainty_type": "pragmatic IQR-bracketing second-order distribution",
+            "note": "IQR endpoints are not empirical minimum and maximum.",
+            "sample_once_per_psa_iteration": true,
+            "shared_between_strategies": true
+          }
+        },
+        "duration_days": {
+          "parameter_id": "duration_acute_ich_days",
+          "base_case": 12.0,
+          "psa": {
+            "distribution": "triangular",
+            "low": 10.0,
+            "mode": 12.0,
+            "high": 14.0,
+            "uncertainty_target": "mean duration of the acute ICH phase",
+            "uncertainty_type": "evidence-informed proxy based on hemostatic treatment duration",
+            "sample_once_per_psa_iteration": true,
+            "shared_between_strategies": true
+          },
+          "reference": {
+            "citation": "Srivastava A, Santagostino E, Dougall A, et al. WFH Guidelines for the Management of Hemophilia, 3rd edition. Haemophilia. 2020;26(Suppl 6):1-158. doi:10.1111/hae.14046.",
+            "evidence": "For confirmed CNS bleeding, WFH recommends maintaining appropriate factor levels for 10-14 days.",
+            "limitation": "This is a treatment-duration recommendation, used as a proxy for the acute utility-duration window."
+          }
+        },
+        "formula": "U_event = min(U_effective_chronic, sampled_u_acute_ich_cap)",
+        "implementation": {
+          "carry_across_cycles": true,
+          "state_variable": "acute_ich_time_remaining_days"
+        }
+      }
+    },
+    "post_ich_outcomes": {
+      "enabled": true,
+      "trigger": "Evaluate only for survivors of ICH after the acute ICH phase.",
+      "persistent_neurologic_sequelae": {
+        "probability": {
+          "parameter_id": "p_postich_persistent_sequela",
+          "base_case": 0.257142857,
+          "numerator": 18,
+          "denominator": 70,
+          "reference": {
+            "citation": "Sezgin Evim M, et al. Risk factors for neurologic sequelae in children and adolescents with hemophilia after intracranial hemorrhage. Res Pract Thromb Haemost. 2024;8(8):102607. doi:10.1016/j.rpth.2024.102607.",
+            "population": "Children and adolescents with hemophilia and ICH.",
+            "derivation": "18 neurologic sequelae among 70 survivors whose ICH occurred after the newborn period.",
+            "reason_for_subset": "The microsimulation begins at age 1 year.",
+            "examples": [
+              "epilepsy",
+              "hydrocephalus",
+              "hemiparesis",
+              "speech abnormality",
+              "mild developmental retardation",
+              "sixth nerve palsy"
+            ]
+          },
+          "psa": {
+            "distribution": "beta",
+            "alpha": 18,
+            "beta": 52,
+            "uncertainty_target": "binomial proportion based on observed counts",
+            "sample_once_per_psa_iteration": true,
+            "shared_between_strategies": true
+          }
+        },
+        "definition_warning": "The Sezgin Evim outcome is any persistent neurologic sequela and is not identical to mRS 3-5 disability."
+      },
+      "utility_if_persistent_sequela": {
+        "parameter_id": "u_postich_sequela_cap",
+        "effect_type": "permanent_utility_cap",
+        "base_case": 0.35,
+        "formula": "U_effective_chronic = min(U_arthropathy, sampled_u_postich_sequela_cap)",
+        "reference": {
+          "citation": "Glaeser-Khan S, Ito S, Sra M, et al. Emicizumab for preventing intracranial hemorrhage in infants with severe hemophilia A: a cost-effectiveness analysis. Blood Adv. 2025;9(24):6237-6245. doi:10.1182/bloodadvances.2025016822.",
+          "source_definition": "Published model utility for disability after ICH, mRS 3-5.",
+          "reported_value": 0.35,
+          "reported_beta_pert_range": [
+            0.28,
+            0.42
+          ]
+        },
+        "evidence_type": "indirect severity mapping",
+        "limitation": "Mapping all Sezgin Evim persistent sequelae to the mRS 3-5 utility is not directly observed and may overstate the severity of some sequelae.",
+        "psa": {
+          "distribution": "beta_pert",
+          "minimum": 0.28,
+          "mode": 0.35,
+          "maximum": 0.42,
+          "sample_once_per_psa_iteration": true,
+          "shared_between_strategies": true
+        }
+      },
+      "survivor_without_persistent_sequela": {
+        "base_case_rule": "Return to the pre-ICH chronic arthropathy utility after the acute ICH phase.",
+        "rationale": "Avoids an unsupported permanent penalty when no persistent neurologic sequela is recorded."
+      },
+      "structural_sensitivity_scenarios": {
+        "less_severe_mapping_for_recorded_sequelae": {
+          "description": "Apply the Glaeser-Khan no/mild-disability utility cap to recorded sequelae as an upper-bound scenario.",
+          "utility_cap": 0.78,
+          "psa": {
+            "distribution": "beta_pert",
+            "minimum": 0.63,
+            "mode": 0.78,
+            "maximum": 0.94
+          },
+          "reference": {
+            "citation": "Glaeser-Khan S, Ito S, Sra M, et al. Blood Adv. 2025;9(24):6237-6245. doi:10.1182/bloodadvances.2025016822.",
+            "source_definition": "Utility for no/mild disability after ICH, mRS 0-2."
+          }
+        },
+        "published_glaeser_khan_two_state_structure": {
+          "description": "Use the published hemophilia ICH economic-model structure as a package.",
+          "probability_disability_after_ich": 0.38,
+          "probability_psa": {
+            "distribution": "beta_pert",
+            "minimum": 0.304,
+            "mode": 0.38,
+            "maximum": 0.456
+          },
+          "utility_if_disability": 0.35,
+          "utility_if_no_or_mild_disability": 0.78,
+          "reference": {
+            "citation": "Glaeser-Khan S, Ito S, Sra M, et al. Blood Adv. 2025;9(24):6237-6245. doi:10.1182/bloodadvances.2025016822."
+          },
+          "limitation": "The published model targets infants aged 0-1 year, whereas the present microsimulation starts at age 1 year."
+        }
+      },
+      "implementation": {
+        "history_variable": "post_ich_neurologic_sequelae_flag",
+        "initial_value": false,
+        "absorbing": true,
+        "event_order": [
+          "ICH occurs",
+          "evaluate ICH case fatality at the event time",
+          "if fatal: transition to death and do not evaluate sequelae",
+          "if survived: initialize acute_ich_time_remaining_days and apply acute ICH utility cap",
+          "after acute ICH phase: if no pre-existing sequela flag, sample persistent neurologic sequelae",
+          "if sequela occurs: set post_ich_neurologic_sequelae_flag=true permanently"
+        ],
+        "recurrent_ich_rule": "If the sequela flag is already true, it remains true after subsequent nonfatal ICH. If false, sequelae may be evaluated after each survived ICH."
+      }
+    },
+    "acute_event_timing_and_overlap": {
+      "within_cycle_onset": {
+        "rule": "Assign each acute event an onset time within the weekly cycle.",
+        "recommended_sampling": "Uniform over the 7-day cycle when no empirical day-of-week pattern is modeled.",
+        "purpose": "Allows duration to cross cycle boundaries and avoids forcing every event to start at the cycle boundary."
+      },
+      "carryover": {
+        "enabled_for_all_acute_events": true,
+        "rule": "Any unused event duration at cycle end is carried into subsequent cycles."
+      },
+      "overlap": {
+        "rule": "At any time point, calculate all applicable event utilities and use the lowest resulting utility.",
+        "do_not_sum_unbounded_decrements": true,
+        "joint_history_rule": "Each joint bleed increments cumulative joint-bleed history even if its acute utility interval overlaps another event."
+      },
+      "death": "Truncate all active event durations at death."
+    },
+    "weekly_qaly_calculation": {
+      "cycle_length_years": 0.019230769230769232,
+      "cycles_per_model_year": 52,
+      "within_cycle_days": 7,
+      "qaly_time_denominator_model_days": 364,
+      "reason_for_364": "The model defines one weekly cycle as 1/52 of a model year. Therefore 7 model-days correspond to 1/52 year, and daily utility weights are 1/(52*7)=1/364. Using 365.25 while also using exactly 52 cycles/year would under-accrue QALYs.",
+      "step_1": "Determine U_arthropathy from current Pettersson score.",
+      "step_2": "Apply permanent post-ICH utility cap if the sequela flag is active.",
+      "step_3": "Apply acute-event decrement/cap over the fraction of the cycle affected by each event.",
+      "no_event_formula": "weekly_QALY = U_effective_chronic / 52",
+      "general_formula": "weekly_QALY = integral_over_cycle(U(t) dt) / 364, with t measured in model-days",
+      "integer_day_equivalent": "weekly_QALY = sum(daily_utilities_over_7_days) / 364",
+      "partial_day_rule": "If a sampled duration is fractional, weight the final affected day by the corresponding fractional day.",
+      "death_rule": {
+        "after_death_utility": 0.0,
+        "within_cycle": "Accrue QALY only for time alive before death."
+      }
+    },
+    "psa_rules": {
+      "sampling_level": "second_order_parameter_uncertainty",
+      "sample_once_per_psa_iteration": true,
+      "same_parameter_draws_for_both_strategies": true,
+      "shared_parameter_ids": [
+        "u_pediatric_anchor",
+        "Fischer PS-group mean utilities",
+        "du_minor_bleed_day",
+        "duration_minor_bleed_days",
+        "u_nonich_major_bleed_cap",
+        "duration_nonich_major_bleed_days",
+        "u_acute_ich_cap",
+        "duration_acute_ich_days",
+        "p_postich_persistent_sequela",
+        "u_postich_sequela_cap"
+      ],
+      "first_order_randomness": [
+        "bleed occurrence",
+        "bleed type",
+        "within-cycle acute-event onset time",
+        "ICH occurrence",
+        "post-ICH neurologic sequela Bernoulli outcome",
+        "death"
+      ],
+      "constraints": {
+        "utility_bounds": [
+          0.0,
+          1.0
+        ],
+        "chronic_utility_monotonicity": "U_PS0_12 >= U_PS13_21 >= U_PS22_39 >= U_PS40_78",
+        "event_utility_floor": 0.0
+      }
+    },
+    "external_validation_targets": {
+      "zhang_2023": {
+        "reference": "Zhang L, Zhang P, Chen W. Orphanet J Rare Dis. 2023;18:232. doi:10.1186/s13023-023-02835-x.",
+        "observed_eq5d": {
+          "on_demand_mean": 0.804,
+          "on_demand_sd": 0.255,
+          "short_term_prophylaxis_mean": 0.890,
+          "short_term_prophylaxis_sd": 0.157,
+          "long_term_prophylaxis_mean": 0.952,
+          "long_term_prophylaxis_sd": 0.125
+        },
+        "use": "Face-validity check for overall simulated utilities; treatment-group values must not be assigned directly to model arms.",
+        "independence_note": "The long-term prophylaxis value is also used as the common pediatric anchor, so it is not an independent validation of that anchor."
+      },
+      "neufeld_2012_pediatric_diary": {
+        "reference": "Neufeld EJ, Recht M, Sabio H, et al. Value Health. 2012;15(6):916-925. doi:10.1016/j.jval.2012.05.005.",
+        "patient_mean_eq5d_age_le_18": {
+          "nonbleed_mean": 0.92,
+          "nonbleed_sd": 0.086,
+          "bleed_mean": 0.76,
+          "bleed_sd": 0.111
+        },
+        "use": "External plausibility check for high pediatric nonbleed utility and for the approximately 0.16 acute bleed decrement.",
+        "limitation": "Patients had congenital hemophilia with inhibitors and frequent bleeding."
+      },
+      "wasserman_2005": {
+        "reference": "Wasserman J, Aday LA, Begley CE, Ahn C, Lairson DR. Measuring health state preferences for hemophilia: development of a disease-specific utility instrument. Haemophilia. 2005;11(1):49-57. doi:10.1111/j.1365-2516.2005.01054.x.",
+        "pediatric_respondent_group": {
+          "age_range": "7 months to 18 years",
+          "mean_age_years": 10,
+          "parent_proxy_for_age_14_or_younger": true
+        },
+        "standard_gamble_health_states": {
+          "severe_episodic_mean": 0.868,
+          "severe_episodic_sd": 0.124,
+          "severe_prophylaxis_mean": 0.872,
+          "severe_prophylaxis_sd": 0.137
+        },
+        "use": "External validation only; the vignettes describe a hypothetical 21-year-old and already embed treatment, bleeding, and joint consequences."
       }
     }
   }
