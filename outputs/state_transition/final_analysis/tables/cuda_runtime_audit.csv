@@ -1,0 +1,2 @@
+cuda_available,selected_for_final_psa,selection_reason
+false,false,Validated but slower than 12-core CPU-JIT for FP64 rewards

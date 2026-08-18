@@ -1,0 +1,49 @@
+{
+  "base_case": "base_case",
+  "scenarios": [
+    {
+      "id": "base_case",
+      "label": "Direct AJBR and direct ICH rates",
+      "description": "Deterministic base case with 5.8% cost and 5% QALY discounting.",
+      "options": {"joint_rate_method": "direct", "ich_rate_method": "direct", "mild_utility_rule": "base", "post_ich_utility_rule": "severe", "discounting": true},
+      "references": ["ref_44", "ref_46"]
+    },
+    {
+      "id": "joint_fraction",
+      "label": "Fraction-based AJBR",
+      "description": "AJBR is calculated as sampled ABR multiplied by the sampled joint-bleed fraction.",
+      "options": {"joint_rate_method": "fraction", "ich_rate_method": "direct", "mild_utility_rule": "base", "post_ich_utility_rule": "severe", "discounting": true},
+      "references": ["ref_45"]
+    },
+    {
+      "id": "ich_fraction",
+      "label": "Fraction-based ICH",
+      "description": "ICH rate is calculated as sampled ABR multiplied by the CNS/ICH proxy fraction.",
+      "options": {"joint_rate_method": "direct", "ich_rate_method": "fraction", "mild_utility_rule": "base", "post_ich_utility_rule": "severe", "discounting": true},
+      "references": ["ref_45"],
+      "assumption": "WBDR CNS fraction is used as a proxy for ICH."
+    },
+    {
+      "id": "mild_arthropathy_no_decrement",
+      "label": "No mild-arthropathy decrement",
+      "description": "Mild arthropathy uses the pediatric anchor instead of the base derived utility.",
+      "options": {"joint_rate_method": "direct", "ich_rate_method": "direct", "mild_utility_rule": "anchor", "post_ich_utility_rule": "severe", "discounting": true},
+      "references": ["ref_31"]
+    },
+    {
+      "id": "post_ich_mild_utility",
+      "label": "Less severe post-ICH mapping",
+      "description": "Persistent sequela uses the 0.78 mild/no-moderate disability utility cap.",
+      "options": {"joint_rate_method": "direct", "ich_rate_method": "direct", "mild_utility_rule": "base", "post_ich_utility_rule": "mild", "discounting": true},
+      "references": ["ref_55"]
+    },
+    {
+      "id": "no_discount",
+      "label": "No discounting",
+      "description": "Both cost and QALY discount rates are set to zero.",
+      "parameter_overrides": {"cost_discount_rate": 0, "qaly_discount_rate": 0},
+      "options": {"joint_rate_method": "direct", "ich_rate_method": "direct", "mild_utility_rule": "base", "post_ich_utility_rule": "severe", "discounting": false},
+      "assumption": "Pre-specified structural sensitivity scenario."
+    }
+  ]
+}

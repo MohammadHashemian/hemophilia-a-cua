@@ -1,0 +1,34 @@
+[
+  {
+    "n_patients": 10000,
+    "incremental_cost_irr": 33549943219.703487,
+    "incremental_qaly": 0.2445946032494133,
+    "relative_change_cost": null,
+    "relative_change_qaly": null,
+    "converged": false
+  },
+  {
+    "n_patients": 25000,
+    "incremental_cost_irr": 33543811584.650158,
+    "incremental_qaly": 0.24116802306124274,
+    "relative_change_cost": 0.00018276141372806947,
+    "relative_change_qaly": 0.014009222373056452,
+    "converged": false
+  },
+  {
+    "n_patients": 50000,
+    "incremental_cost_irr": 33542613741.039814,
+    "incremental_qaly": 0.24027721582996975,
+    "relative_change_cost": 3.570982407056189e-05,
+    "relative_change_qaly": 0.0036937203364095276,
+    "converged": true
+  },
+  {
+    "n_patients": 100000,
+    "incremental_cost_irr": 33542053440.64435,
+    "incremental_qaly": 0.2382102069037737,
+    "relative_change_cost": 1.6704136409629765e-05,
+    "relative_change_qaly": 0.008602600621353745,
+    "converged": true
+  }
+]

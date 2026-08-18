@@ -1,0 +1,13 @@
+strategy,check,passed
+prophylaxis,pettersson_within_0_78,true
+prophylaxis,patient_qaly_non_negative,true
+prophylaxis,patient_qaly_not_above_life_years,true
+prophylaxis,patient_cost_non_negative,true
+prophylaxis,patient_factor_non_negative,true
+prophylaxis,bleed_components_reconcile,true
+on_demand,pettersson_within_0_78,true
+on_demand,patient_qaly_non_negative,true
+on_demand,patient_qaly_not_above_life_years,true
+on_demand,patient_cost_non_negative,true
+on_demand,patient_factor_non_negative,true
+on_demand,bleed_components_reconcile,true

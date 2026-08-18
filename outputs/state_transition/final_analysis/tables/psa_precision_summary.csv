@@ -1,0 +1,2 @@
+completed_iterations,relative_mcse_mean_incremental_qaly,iterations_estimated_for_1pct_relative_mcse_qaly,worst_case_95pct_ceac_margin_at_2500,worst_case_95pct_ceac_margin_at_10000,rule_of_three_upper_probability_if_zero_events
+2500,0.007407502130731884,1372,0.0196,0.0098,0.0012

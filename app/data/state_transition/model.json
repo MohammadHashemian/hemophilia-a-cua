@@ -1,0 +1,1008 @@
+{
+  "metadata": {
+    "study_id": "HA_PEDIATRIC_IRAN_STM_2026",
+    "title": "Cost-utility of prophylaxis versus on-demand FVIII in patients with severe hemophilia A",
+    "model_type": "individual_level_state_transition_microsimulation",
+    "perspective": "payer",
+    "currency": "IRR",
+    "specification_version": "1.1.0",
+    "python_version": "3.11"
+  },
+  "settings": {
+    "entry_age_years": "entry_age_years",
+    "exit_age_years": "exit_age_years",
+    "cycles_per_year": "cycles_per_year",
+    "days_per_cycle": "days_per_cycle",
+    "default_patients": "default_patients",
+    "convergence_threshold": "convergence_threshold",
+    "psa_iterations": "psa_iterations",
+    "seed": "seed",
+    "utility_integration_step_days": "utility_integration_step_days",
+    "chronic_states": [
+      "no_minimal_arthropathy",
+      "mild_arthropathy",
+      "moderate_arthropathy",
+      "severe_arthropathy",
+      "death"
+    ],
+    "acute_events": [
+      "joint_bleed",
+      "non_major_non_joint_bleed",
+      "non_ich_major_bleed",
+      "intracranial_hemorrhage"
+    ]
+  },
+  "parameters": {
+    "entry_age_years": {
+      "id": "entry_age_years",
+      "description": "Age at model entry",
+      "value": 1,
+      "unit": "year",
+      "assumption": "The analysis cohort enters on the first birthday."
+    },
+    "exit_age_years": {
+      "id": "exit_age_years",
+      "description": "Exclusive exit age: follow-up stops immediately before the 12th birthday",
+      "value": 12,
+      "unit": "year",
+      "references": [
+        "ref_6"
+      ],
+      "assumption": "WFH child definition is age below 12 years; age 12 is not simulated as a completed year."
+    },
+    "cycles_per_year": {
+      "id": "cycles_per_year",
+      "description": "Weekly cycles per model year",
+      "value": 52,
+      "unit": "cycle/year",
+      "references": [
+        "ref_17"
+      ]
+    },
+    "days_per_cycle": {
+      "id": "days_per_cycle",
+      "description": "Days represented by one weekly cycle",
+      "value": 7,
+      "unit": "model-day/cycle",
+      "assumption": "One model year is defined as 52 seven-day cycles (364 model-days)."
+    },
+    "default_patients": {
+      "id": "default_patients",
+      "description": "Starting population for production convergence runs",
+      "value": 100000,
+      "unit": "patient",
+      "assumption": "Final N is selected by the pre-specified <1% Monte Carlo convergence rule.",
+      "owsa": {
+        "low": 10000,
+        "high": 200000
+      }
+    },
+    "convergence_threshold": {
+      "id": "convergence_threshold",
+      "description": "Maximum relative change allowed between successive population sizes",
+      "value": 0.01,
+      "unit": "proportion",
+      "assumption": "Pre-specified Monte Carlo convergence criterion."
+    },
+    "psa_iterations": {
+      "id": "psa_iterations",
+      "description": "Second-order PSA iterations",
+      "value": 10000,
+      "unit": "iteration",
+      "references": [
+        "ref_49"
+      ]
+    },
+    "seed": {
+      "id": "seed",
+      "description": "Master reproducibility seed",
+      "value": 20260813,
+      "unit": "integer",
+      "assumption": "Project seed; recorded with every run manifest."
+    },
+    "utility_integration_step_days": {
+      "id": "utility_integration_step_days",
+      "description": "Numerical grid for within-cycle utility integration",
+      "value": 1.0,
+      "unit": "day",
+      "assumption": "Daily grid with fractional edge weighting on a 364 model-day year; 0.25 day is retained for a numerical-precision check.",
+      "owsa": {
+        "low": 0.25,
+        "high": 1.0
+      }
+    },
+    "abr_prophylaxis": {
+      "id": "abr_prophylaxis",
+      "description": "Annual bleeding rate under prophylaxis",
+      "value": 3.05,
+      "unit": "event/patient-year",
+      "references": [
+        "ref_44"
+      ],
+      "owsa": {
+        "low": 2.1,
+        "high": 4.0
+      },
+      "psa": {
+        "distribution": "uniform",
+        "parameters": {
+          "low": 2.1,
+          "high": 4.0
+        }
+      }
+    },
+    "abr_on_demand": {
+      "id": "abr_on_demand",
+      "description": "Annual bleeding rate under on-demand treatment",
+      "value": 13.8,
+      "unit": "event/patient-year",
+      "references": [
+        "ref_44"
+      ],
+      "owsa": {
+        "low": 12.0,
+        "high": 15.6
+      },
+      "psa": {
+        "distribution": "uniform",
+        "parameters": {
+          "low": 12.0,
+          "high": 15.6
+        }
+      }
+    },
+    "ajbr_prophylaxis": {
+      "id": "ajbr_prophylaxis",
+      "description": "Direct annualized joint bleeding rate under prophylaxis",
+      "value": 1.05,
+      "unit": "event/patient-year",
+      "references": [
+        "ref_44"
+      ],
+      "owsa": {
+        "low": 1.0,
+        "high": 1.1
+      },
+      "psa": {
+        "distribution": "uniform",
+        "parameters": {
+          "low": 1.0,
+          "high": 1.1
+        }
+      }
+    },
+    "ajbr_on_demand": {
+      "id": "ajbr_on_demand",
+      "description": "Direct annualized joint bleeding rate under on-demand treatment",
+      "value": 9.85,
+      "unit": "event/patient-year",
+      "references": [
+        "ref_44"
+      ],
+      "owsa": {
+        "low": 5.5,
+        "high": 14.2
+      },
+      "psa": {
+        "distribution": "uniform",
+        "parameters": {
+          "low": 5.5,
+          "high": 14.2
+        }
+      }
+    },
+    "joint_bleed_fraction": {
+      "id": "joint_bleed_fraction",
+      "description": "Joint bleeds as a fraction of all bleeds",
+      "value": 0.76,
+      "unit": "proportion",
+      "references": [
+        "ref_45"
+      ],
+      "assumption": "SD=0.03 is a model assumption because direct uncertainty was unavailable.",
+      "owsa": {
+        "low": 0.70,
+        "high": 0.82
+      },
+      "psa": {
+        "distribution": "beta",
+        "parameters": {
+          "alpha": 153.3,
+          "beta": 48.4
+        }
+      }
+    },
+    "ich_rate_prophylaxis": {
+      "id": "ich_rate_prophylaxis",
+      "description": "Direct annual ICH rate under prophylaxis",
+      "value": 0.00033,
+      "unit": "event/patient-year",
+      "references": [
+        "ref_46"
+      ],
+      "assumption": "PSA SD is 50% of the mean.",
+      "owsa": {
+        "low": 0.000165,
+        "high": 0.000495
+      },
+      "psa": {
+        "distribution": "gamma",
+        "parameters": {
+          "shape": 4,
+          "scale": 0.0000825
+        }
+      }
+    },
+    "ich_rate_on_demand": {
+      "id": "ich_rate_on_demand",
+      "description": "Direct annual ICH rate under on-demand treatment",
+      "value": 0.017,
+      "unit": "event/patient-year",
+      "references": [
+        "ref_46"
+      ],
+      "assumption": "PSA SD is 50% of the mean.",
+      "owsa": {
+        "low": 0.0085,
+        "high": 0.0255
+      },
+      "psa": {
+        "distribution": "gamma",
+        "parameters": {
+          "shape": 4,
+          "scale": 0.00425
+        }
+      }
+    },
+    "ich_fraction": {
+      "id": "ich_fraction",
+      "description": "CNS/ICH fraction of all bleeds for structural scenario",
+      "value": 0.00133,
+      "unit": "proportion",
+      "references": [
+        "ref_45"
+      ],
+      "assumption": "CNS bleeds are used as an ICH proxy; SD=0.0005 is a model assumption.",
+      "owsa": {
+        "low": 0.00033,
+        "high": 0.00233
+      },
+      "psa": {
+        "distribution": "beta",
+        "parameters": {
+          "alpha": 7.07,
+          "beta": 5306.36
+        }
+      }
+    },
+    "non_ich_major_fraction": {
+      "id": "non_ich_major_fraction",
+      "description": "GI plus neck/throat bleeds as a fraction of all bleeds",
+      "value": 0.00468,
+      "unit": "proportion",
+      "references": [
+        "ref_45"
+      ],
+      "assumption": "SD=0.001 is a model assumption.",
+      "owsa": {
+        "low": 0.00268,
+        "high": 0.00668
+      },
+      "psa": {
+        "distribution": "beta",
+        "parameters": {
+          "alpha": 21.80,
+          "beta": 4636.24
+        }
+      }
+    },
+    "ich_case_fatality": {
+      "id": "ich_case_fatality",
+      "description": "Case fatality conditional on ICH",
+      "value": 0.0833333333,
+      "unit": "proportion",
+      "references": [
+        "ref_46"
+      ],
+      "owsa": {
+        "low": 0.01,
+        "high": 0.20
+      },
+      "psa": {
+        "distribution": "beta",
+        "parameters": {
+          "alpha": 2,
+          "beta": 22
+        }
+      }
+    },
+    "post_ich_sequela_probability": {
+      "id": "post_ich_sequela_probability",
+      "description": "Persistent neurologic sequela among post-neonatal ICH survivors",
+      "value": 0.2571428571,
+      "unit": "proportion",
+      "references": [
+        "ref_43"
+      ],
+      "owsa": {
+        "low": 0.15,
+        "high": 0.40
+      },
+      "psa": {
+        "distribution": "beta",
+        "parameters": {
+          "alpha": 18,
+          "beta": 52
+        }
+      }
+    },
+    "joint_bleeds_per_pettersson_point": {
+      "id": "joint_bleeds_per_pettersson_point",
+      "description": "Cumulative joint bleeds per one Pettersson point",
+      "value": 13,
+      "unit": "joint bleed/score point",
+      "references": [
+        "ref_31",
+        "ref_40"
+      ],
+      "owsa": {
+        "low": 11.1,
+        "high": 14.7
+      },
+      "psa": {
+        "distribution": "triangular",
+        "parameters": {
+          "low": 11.1,
+          "mode": 12.6,
+          "high": 14.7
+        }
+      }
+    },
+    "pettersson_max": {
+      "id": "pettersson_max",
+      "description": "Maximum Pettersson score",
+      "value": 78,
+      "unit": "score",
+      "references": [
+        "ref_29"
+      ]
+    },
+    "background_mortality_age_1_4": {
+      "id": "background_mortality_age_1_4",
+      "description": "Annual background mortality hazard from age 1 to less than 5",
+      "value": 0.00043646,
+      "unit": "hazard/year",
+      "references": [
+        "ref_48"
+      ]
+    },
+    "background_mortality_age_5_9": {
+      "id": "background_mortality_age_5_9",
+      "description": "Annual background mortality hazard from age 5 to less than 10",
+      "value": 0.00042590,
+      "unit": "hazard/year",
+      "references": [
+        "ref_48"
+      ]
+    },
+    "background_mortality_age_10_lt12": {
+      "id": "background_mortality_age_10_lt12",
+      "description": "Annual background mortality hazard from age 10 to less than 12",
+      "value": 0.00038555,
+      "unit": "hazard/year",
+      "references": [
+        "ref_48"
+      ]
+    },
+    "weight_age_1": {
+      "id": "weight_age_1",
+      "description": "Reference body weight at age 1",
+      "value": 9.6,
+      "unit": "kg",
+      "references": [
+        "ref_50"
+      ]
+    },
+    "weight_age_2": {
+      "id": "weight_age_2",
+      "description": "Reference body weight at age 2",
+      "value": 12.2,
+      "unit": "kg",
+      "references": [
+        "ref_50"
+      ]
+    },
+    "weight_age_3": {
+      "id": "weight_age_3",
+      "description": "Reference body weight at age 3",
+      "value": 14.3,
+      "unit": "kg",
+      "references": [
+        "ref_50"
+      ]
+    },
+    "weight_age_4": {
+      "id": "weight_age_4",
+      "description": "Reference body weight at age 4",
+      "value": 16.3,
+      "unit": "kg",
+      "references": [
+        "ref_50"
+      ]
+    },
+    "weight_age_5": {
+      "id": "weight_age_5",
+      "description": "Reference body weight at age 5",
+      "value": 18.3,
+      "unit": "kg",
+      "references": [
+        "ref_50"
+      ]
+    },
+    "weight_age_6": {
+      "id": "weight_age_6",
+      "description": "Reference body weight at age 6",
+      "value": 20.5,
+      "unit": "kg",
+      "references": [
+        "ref_51"
+      ]
+    },
+    "weight_age_7": {
+      "id": "weight_age_7",
+      "description": "Reference body weight at age 7",
+      "value": 22.9,
+      "unit": "kg",
+      "references": [
+        "ref_51"
+      ]
+    },
+    "weight_age_8": {
+      "id": "weight_age_8",
+      "description": "Reference body weight at age 8",
+      "value": 25.4,
+      "unit": "kg",
+      "references": [
+        "ref_51"
+      ]
+    },
+    "weight_age_9": {
+      "id": "weight_age_9",
+      "description": "Reference body weight at age 9",
+      "value": 28.1,
+      "unit": "kg",
+      "references": [
+        "ref_51"
+      ]
+    },
+    "weight_age_10": {
+      "id": "weight_age_10",
+      "description": "Reference body weight at age 10",
+      "value": 31.2,
+      "unit": "kg",
+      "references": [
+        "ref_51"
+      ]
+    },
+    "weight_age_11": {
+      "id": "weight_age_11",
+      "description": "Model-derived reference body weight at age 11",
+      "value": 34.6,
+      "unit": "kg",
+      "references": [
+        "ref_51"
+      ],
+      "assumption": "Derived from median BMI-for-age multiplied by squared median height-for-age."
+    },
+    "weight_age_12": {
+      "id": "weight_age_12",
+      "description": "Model-derived reference body weight at age 12",
+      "value": 38.9,
+      "unit": "kg",
+      "references": [
+        "ref_51"
+      ],
+      "assumption": "Derived from median BMI-for-age multiplied by squared median height-for-age."
+    },
+    "factor_price_irr_per_iu": {
+      "id": "factor_price_irr_per_iu",
+      "description": "Official unit price of plasma-derived SHL FVIII",
+      "value": 58000,
+      "unit": "IRR/IU",
+      "assumption": "Current analysis price confirmed on 2026-08-15: 58,000 Iranian rial for each IU of human plasma-derived standard-half-life factor VIII.",
+      "owsa": {
+        "low": 46400,
+        "high": 69600
+      }
+    },
+    "prophylaxis_iu_per_kg_week": {
+      "id": "prophylaxis_iu_per_kg_week",
+      "description": "25 IU/kg three times weekly",
+      "value": 75,
+      "unit": "IU/kg/week",
+      "references": [
+        "ref_34",
+        "ref_6"
+      ],
+      "owsa": {
+        "low": 50,
+        "high": 100
+      }
+    },
+    "joint_bleed_iu_per_kg": {
+      "id": "joint_bleed_iu_per_kg",
+      "description": "FVIII consumption per joint bleed",
+      "value": 50,
+      "unit": "IU/kg/event",
+      "references": [
+        "ref_40",
+        "ref_34"
+      ],
+      "owsa": {
+        "low": 25,
+        "high": 75
+      },
+      "psa": {
+        "distribution": "triangular",
+        "parameters": {
+          "low": 25,
+          "mode": 50,
+          "high": 75
+        }
+      }
+    },
+    "non_major_non_joint_iu_per_kg": {
+      "id": "non_major_non_joint_iu_per_kg",
+      "description": "FVIII consumption per non-major non-joint bleed",
+      "value": 50,
+      "unit": "IU/kg/event",
+      "references": [
+        "ref_6",
+        "ref_52"
+      ],
+      "owsa": {
+        "low": 25,
+        "high": 75
+      },
+      "psa": {
+        "distribution": "triangular",
+        "parameters": {
+          "low": 25,
+          "mode": 50,
+          "high": 75
+        }
+      }
+    },
+    "non_ich_major_iu_per_kg": {
+      "id": "non_ich_major_iu_per_kg",
+      "description": "Model-derived FVIII course per non-ICH major bleed",
+      "value": 520,
+      "unit": "IU/kg/event",
+      "references": [
+        "ref_6"
+      ],
+      "assumption": "45 IU/kg initial dose plus 19 maintenance doses of 25 IU/kg over 10 days.",
+      "owsa": {
+        "low": 370,
+        "high": 720
+      },
+      "psa": {
+        "distribution": "triangular",
+        "parameters": {
+          "low": 370,
+          "mode": 520,
+          "high": 720
+        }
+      }
+    },
+    "ich_iu_per_kg": {
+      "id": "ich_iu_per_kg",
+      "description": "Model-derived FVIII course per ICH",
+      "value": 620,
+      "unit": "IU/kg/event",
+      "references": [
+        "ref_6"
+      ],
+      "assumption": "45 IU/kg initial dose plus 23 maintenance doses of 25 IU/kg over 12 days.",
+      "owsa": {
+        "low": 520,
+        "high": 720
+      },
+      "psa": {
+        "distribution": "triangular",
+        "parameters": {
+          "low": 520,
+          "mode": 620,
+          "high": 720
+        }
+      }
+    },
+    "utility_anchor": {
+      "id": "utility_anchor",
+      "description": "Common pediatric chronic-utility anchor",
+      "value": 0.952,
+      "unit": "utility",
+      "references": [
+        "ref_53"
+      ],
+      "assumption": "Anchor only; not interpreted as full health or an independent prophylaxis effect.",
+      "owsa": {
+        "low": 0.90,
+        "high": 0.99
+      },
+      "psa": {
+        "distribution": "beta",
+        "parameters": {
+          "alpha": 49.162986,
+          "beta": 2.478806
+        }
+      }
+    },
+    "utility_mild": {
+      "id": "utility_mild",
+      "description": "Mild arthropathy utility derived from Fischer ratio",
+      "value": 0.9163,
+      "unit": "utility",
+      "references": [
+        "ref_31"
+      ],
+      "owsa": {
+        "low": 0.85,
+        "high": 0.952
+      }
+    },
+    "utility_moderate": {
+      "id": "utility_moderate",
+      "description": "Moderate arthropathy utility derived from Fischer ratio",
+      "value": 0.8330,
+      "unit": "utility",
+      "references": [
+        "ref_31"
+      ],
+      "owsa": {
+        "low": 0.75,
+        "high": 0.90
+      }
+    },
+    "utility_severe": {
+      "id": "utility_severe",
+      "description": "Severe arthropathy utility with monotonic cap",
+      "value": 0.8330,
+      "unit": "utility",
+      "references": [
+        "ref_31"
+      ],
+      "assumption": "Capped at moderate-state utility to preserve monotonicity.",
+      "owsa": {
+        "low": 0.70,
+        "high": 0.88
+      }
+    },
+    "fischer_sf6d_0_4": {
+      "id": "fischer_sf6d_0_4",
+      "description": "Fischer mean SF-6D for PS 0-4",
+      "value": 0.80,
+      "unit": "utility",
+      "references": [
+        "ref_31"
+      ],
+      "psa": {
+        "distribution": "beta",
+        "parameters": {
+          "alpha": 249.140828,
+          "beta": 62.285207
+        }
+      }
+    },
+    "fischer_sf6d_5_12": {
+      "id": "fischer_sf6d_5_12",
+      "description": "Fischer mean SF-6D for PS 5-12",
+      "value": 0.80,
+      "unit": "utility",
+      "references": [
+        "ref_31"
+      ],
+      "psa": {
+        "distribution": "beta",
+        "parameters": {
+          "alpha": 310.311111,
+          "beta": 77.577778
+        }
+      }
+    },
+    "fischer_sf6d_13_21": {
+      "id": "fischer_sf6d_13_21",
+      "description": "Fischer mean SF-6D for PS 13-21",
+      "value": 0.77,
+      "unit": "utility",
+      "references": [
+        "ref_31"
+      ],
+      "psa": {
+        "distribution": "beta",
+        "parameters": {
+          "alpha": 289.715917,
+          "beta": 86.538521
+        }
+      }
+    },
+    "fischer_sf6d_22_39": {
+      "id": "fischer_sf6d_22_39",
+      "description": "Fischer mean SF-6D for PS 22-39",
+      "value": 0.70,
+      "unit": "utility",
+      "references": [
+        "ref_31"
+      ],
+      "psa": {
+        "distribution": "beta",
+        "parameters": {
+          "alpha": 377.008333,
+          "beta": 161.575
+        }
+      }
+    },
+    "fischer_sf6d_40_78": {
+      "id": "fischer_sf6d_40_78",
+      "description": "Fischer mean SF-6D for PS 40-78",
+      "value": 0.71,
+      "unit": "utility",
+      "references": [
+        "ref_31"
+      ],
+      "psa": {
+        "distribution": "beta",
+        "parameters": {
+          "alpha": 422.150744,
+          "beta": 172.427769
+        }
+      }
+    },
+    "minor_bleed_decrement": {
+      "id": "minor_bleed_decrement",
+      "description": "Acute decrement for joint and non-major non-joint bleeds",
+      "value": 0.16,
+      "unit": "utility",
+      "references": [
+        "ref_35"
+      ],
+      "owsa": {
+        "low": 0.128,
+        "high": 0.192
+      },
+      "psa": {
+        "distribution": "triangular",
+        "parameters": {
+          "low": 0.128,
+          "mode": 0.16,
+          "high": 0.192
+        }
+      }
+    },
+    "minor_bleed_duration_days": {
+      "id": "minor_bleed_duration_days",
+      "description": "Acute utility duration for minor bleeds",
+      "value": 2,
+      "unit": "day/event",
+      "references": [
+        "ref_6"
+      ],
+      "assumption": "Treatment-duration evidence is used as a proxy for acute utility duration.",
+      "owsa": {
+        "low": 1,
+        "high": 3
+      },
+      "psa": {
+        "distribution": "triangular",
+        "parameters": {
+          "low": 1,
+          "mode": 2,
+          "high": 3
+        }
+      }
+    },
+    "non_ich_major_utility_cap": {
+      "id": "non_ich_major_utility_cap",
+      "description": "Acute utility cap for non-ICH major bleed",
+      "value": 0.65,
+      "unit": "utility",
+      "references": [
+        "ref_54"
+      ],
+      "assumption": "Nonfatal GI bleed is an indirect proxy for pediatric hemophilia.",
+      "owsa": {
+        "low": 0.15,
+        "high": 0.86
+      },
+      "psa": {
+        "distribution": "triangular",
+        "parameters": {
+          "low": 0.15,
+          "mode": 0.65,
+          "high": 0.86
+        }
+      }
+    },
+    "non_ich_major_duration_days": {
+      "id": "non_ich_major_duration_days",
+      "description": "Acute utility duration for non-ICH major bleed",
+      "value": 7,
+      "unit": "day/event",
+      "references": [
+        "ref_54"
+      ],
+      "owsa": {
+        "low": 5,
+        "high": 10
+      },
+      "psa": {
+        "distribution": "triangular",
+        "parameters": {
+          "low": 5,
+          "mode": 7,
+          "high": 10
+        }
+      }
+    },
+    "ich_acute_utility_cap": {
+      "id": "ich_acute_utility_cap",
+      "description": "Acute ICH utility cap",
+      "value": 0.15,
+      "unit": "utility",
+      "references": [
+        "ref_54"
+      ],
+      "assumption": "Adult preference weight is used only as an acute-severity proxy.",
+      "owsa": {
+        "low": 0,
+        "high": 0.65
+      },
+      "psa": {
+        "distribution": "triangular",
+        "parameters": {
+          "low": 0,
+          "mode": 0.15,
+          "high": 0.65
+        }
+      }
+    },
+    "ich_duration_days": {
+      "id": "ich_duration_days",
+      "description": "Duration of the acute ICH phase",
+      "value": 12,
+      "unit": "day/event",
+      "references": [
+        "ref_6"
+      ],
+      "assumption": "WFH hemostatic coverage duration is used as a proxy for acute utility duration.",
+      "owsa": {
+        "low": 10,
+        "high": 14
+      },
+      "psa": {
+        "distribution": "triangular",
+        "parameters": {
+          "low": 10,
+          "mode": 12,
+          "high": 14
+        }
+      }
+    },
+    "post_ich_utility_cap": {
+      "id": "post_ich_utility_cap",
+      "description": "Permanent utility cap for persistent post-ICH sequela",
+      "value": 0.35,
+      "unit": "utility",
+      "references": [
+        "ref_55"
+      ],
+      "assumption": "Conservative indirect mapping of any recorded sequela to mRS 3-5 disability.",
+      "owsa": {
+        "low": 0.28,
+        "high": 0.42
+      },
+      "psa": {
+        "distribution": "beta_pert",
+        "parameters": {
+          "minimum": 0.28,
+          "mode": 0.35,
+          "maximum": 0.42
+        }
+      }
+    },
+    "post_ich_mild_utility_cap": {
+      "id": "post_ich_mild_utility_cap",
+      "description": "Alternative cap for mild/no-moderate post-ICH disability",
+      "value": 0.78,
+      "unit": "utility",
+      "references": [
+        "ref_55"
+      ],
+      "owsa": {
+        "low": 0.63,
+        "high": 0.94
+      },
+      "psa": {
+        "distribution": "beta_pert",
+        "parameters": {
+          "minimum": 0.63,
+          "mode": 0.78,
+          "maximum": 0.94
+        }
+      }
+    },
+    "cost_discount_rate": {
+      "id": "cost_discount_rate",
+      "description": "Annual discount rate for costs",
+      "value": 0.058,
+      "unit": "proportion/year",
+      "references": [
+        "ref_56",
+        "ref_57",
+        "ref_58"
+      ],
+      "owsa": {
+        "low": 0,
+        "high": 0.058
+      }
+    },
+    "qaly_discount_rate": {
+      "id": "qaly_discount_rate",
+      "description": "Annual discount rate for health outcomes",
+      "value": 0.05,
+      "unit": "proportion/year",
+      "references": [
+        "ref_56",
+        "ref_57",
+        "ref_58"
+      ],
+      "owsa": {
+        "low": 0,
+        "high": 0.05
+      }
+    },
+    "gdp_per_capita_irr": {
+      "id": "gdp_per_capita_irr",
+      "description": "GDP per capita used for threshold construction",
+      "value": 1800000000,
+      "unit": "IRR/person",
+      "assumption": "Analysis value; replace with a dated official source before a price-year-specific publication run."
+    },
+    "wtp_irr_per_qaly": {
+      "id": "wtp_irr_per_qaly",
+      "description": "Primary orphan-disease willingness-to-pay threshold",
+      "value": 18000000000,
+      "unit": "IRR/QALY",
+      "references": [
+        "ref_60",
+        "ref_61"
+      ],
+      "assumption": "Ten-times-GDP is a policy scenario and not an official universal Iranian threshold.",
+      "owsa": {
+        "low": 1800000000,
+        "high": 18000000000
+      }
+    }
+  },
+  "formulas": {
+    "exclusive_horizon": "cycles = (12 - 1) * 52 = 572; last cycle starts at age 11 + 51/52",
+    "weekly_rate": "lambda_week = lambda_annual / 52",
+    "event_count": "N[k,i,t] ~ Poisson(lambda[k,weekly])",
+    "residual_bleed_rate": "lambda_non_major_non_joint = ABR - AJBR - lambda_ICH - lambda_non_ICH_major",
+    "pettersson": "PS = min(78, floor(cumulative_joint_bleeds / joint_bleeds_per_pettersson_point))",
+    "weekly_discount": "discount(t) = 1 / (1 + r)^(t/52)",
+    "qaly": "QALY_cycle = integral_0^7 U(t) dt / 364",
+    "icer": "ICER = (Cost_prophylaxis - Cost_on_demand) / (QALY_prophylaxis - QALY_on_demand)",
+    "inmb": "INMB = WTP * incremental_QALY - incremental_cost"
+  },
+  "validation_rules": [
+    "The cohort enters at age 1 and exits before age 12 after exactly 572 weekly cycles.",
+    "All event rates are non-negative and event-rate components sum to ABR.",
+    "Pettersson score remains in [0, 78] and chronic progression is one-way.",
+    "Utilities remain in [0, 1] and overlapping acute effects use the minimum utility.",
+    "Costs and factor consumption are non-negative and denominated in IRR and IU.",
+    "Death is absorbing and assigned to exactly one cause: background mortality or fatal ICH.",
+    "Alive plus background deaths plus ICH deaths equals the initial cohort.",
+    "Paired strategies use identical first-order stream identifiers."
+  ]
+}

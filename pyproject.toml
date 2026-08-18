@@ -3,12 +3,12 @@ requires = ["setuptools>=68", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "markov-chains"
-version = "0.8.0"
-description = "Discrete-time Markov chain toolkit for cost-effectiveness analysis and health economic modeling"
+name = "hemophilia-state-transition-model"
+version = "1.0.0"
+description = "Reference-based individual-level state-transition microsimulation for hemophilia cost-utility analysis"
 readme = "README.md"
 requires-python = ">=3.11"
-license = { text = "MIT" }
+license = "MIT"
 
 authors = [
   { name = "Mohammad Hashemian", email = "muhammadhashemian@gmail.com" },
@@ -26,8 +26,10 @@ keywords = [
 
 classifiers = [
   "Programming Language :: Python :: 3",
-  "Programming Language :: Python :: 3.10",
-  "License :: OSI Approved :: MIT License",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Programming Language :: Python :: 3.14",
   "Intended Audience :: Science/Research",
   "Topic :: Scientific/Engineering :: Medical Science Apps.",
 ]
@@ -65,6 +67,8 @@ dev = ["pytest", "pytest-cov", "mypy", "ruff"]
 
 notebooks = ["jupyter", "seaborn"]
 
+gpu = ["cupy-cuda13x>=14.1", "numba-cuda>=0.30"]
+
 data = ["openpyxl", "beautifulsoup4", "sdv"]
 
 ml = ["scikit-learn", "hmmlearn"]
@@ -72,7 +76,13 @@ ml = ["scikit-learn", "hmmlearn"]
 # Package discovery
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["engine*", "app*", "utils*"]
+include = ["modular_models*", "engine*", "app*", "utils*"]
+
+[tool.setuptools.package-data]
+app = ["data/**/*.json"]
+
+[project.scripts]
+hemophilia-stm = "modular_models.state_transition.cli:main"
 
 # Pytest configuration
 [tool.pytest.ini_options]
@@ -81,7 +91,7 @@ log_cli_level = "INFO"
 pythonpath = ["."]
 log_cli_format = "%(filename)s:%(lineno)d:[%(levelname)s] %(message)s"
 log_cli_date_format = "%Y-%m-%d %H:%M:%S"
-testpaths = "tests"
+testpaths = ["tests/state_transition"]
 # The deprecated/ tree contains a stale, unmaintained test suite that
 # imports a long-removed ``model`` module. Exclude it from collection so
 # that ``pytest`` from the repo root (or any ``pytest <path>`` glob) does
@@ -117,7 +127,7 @@ ignore = ["N999"]
 
 # MyPy configuration
 [tool.mypy]
-python_version = "3.14"
+python_version = "3.11"
 strict = true
 ignore_missing_imports = true
 warn_unreachable = true

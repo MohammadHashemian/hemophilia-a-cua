@@ -1,0 +1,26 @@
+{
+  "schema_version": 2,
+  "analysis": "owsa",
+  "status": "complete",
+  "created_at_utc": "2026-08-16T07:48:25.189463+00:00",
+  "updated_at_utc": "2026-08-17T13:54:11.862848+00:00",
+  "data_fingerprint_sha256": "05b8bd1cf1713ce9122dcd03ce29f186e8741719ec32e5a8f1a4416dd0d596a1",
+  "code_fingerprint_sha256": "94abbed843c10b150b373b8ca4a9a9e7f5bfd17ae21cbe121fb7d634bd50bc37",
+  "python": "3.14.6 | packaged by Anaconda, Inc. | (main, Jul  9 2026, 14:29:05) [MSC v.1942 64 bit (AMD64)]",
+  "platform": "Windows-11-10.0.28000-SP0",
+  "config": {
+    "n_patients": 50000,
+    "output_dir": "C:\\Users\\Jino\\Desktop\\University\\hemophilia\\markov-chain-3-14\\outputs\\state_transition\\final_analysis\\owsa_production",
+    "scenario_id": "base_case",
+    "seed": 20260813,
+    "n_jobs": 0,
+    "include_technical_parameters": false,
+    "parameter_ids": null,
+    "compute_backend": "cpu"
+  },
+  "completed": 60,
+  "total_tasks": 60,
+  "effective_jobs": 12,
+  "parallel_backend": "process",
+  "results_file": "C:\\Users\\Jino\\Desktop\\University\\hemophilia\\markov-chain-3-14\\outputs\\state_transition\\final_analysis\\owsa_production\\owsa_results.parquet"
+}

@@ -1,0 +1,7 @@
+metric,value,unit
+Cost - prophylaxis,40674548797.38663,IRR/patient
+Cost - on demand,7246701974.543728,IRR/patient
+Incremental cost,33427846822.8429,IRR/patient
+Incremental QALY,0.24027721582996975,QALY/patient
+ICER,139122000008.93073,IRR/QALY
+Incremental NMB,-29102856937.903442,IRR/patient

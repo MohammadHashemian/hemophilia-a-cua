@@ -1,0 +1,3 @@
+strategy,cost_irr,qaly,life_years,factor_viii_iu,total_bleeds,joint_bleeds,non_major_non_joint_bleeds,non_ich_major_bleeds,ich_events,pettersson_score,alive_at_end,deaths_total,deaths_background,deaths_ich,mortality_probability,post_ich_count,post_ich_probability
+prophylaxis,40674548797.38663,8.062674314200194,10.970846877495443,1002613.5243105792,33.48242,11.54382,21.77828,0.15642,0.0039,0.37418,49740,260,245,15,0.0052,50,0.001
+on_demand,7246701974.543728,7.8223970983702245,10.883083142965914,178487.21259334014,150.27072,107.267,42.1116,0.70476,0.18736,7.79114,48947,1053,244,809,0.02106,2142,0.04284
