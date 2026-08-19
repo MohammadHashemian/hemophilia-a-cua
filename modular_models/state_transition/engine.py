@@ -272,19 +272,23 @@ class StateTransitionEngine:
             np.minimum(starts + duration_days, death_time),
             starts + duration_days,
         )
-        effective = np.maximum(0.0, end - starts)
+        #  effective = np.maximum(0.0, end - starts)
+        nominal_duration = max(float(duration_days), 1e-12)
         for offset in range(3):
             left = offset * 7.0
             right = left + 7.0
             overlap = np.clip(
-                np.minimum(end, right) - np.maximum(starts, left), 0.0, None
+                np.minimum(end, right) - np.maximum(starts, left),
+                0.0,
+                None,
             )
-            share = np.divide(
-                overlap,
-                effective,
-                out=np.zeros_like(overlap),
-                where=effective > 0,
-            )
+            # share = np.divide(
+            #     overlap,
+            #     effective,
+            #     out=np.zeros_like(overlap),
+            #     where=effective > 0,
+            # )
+            share = overlap / nominal_duration
             allocation = maintenance * share
             if offset == 0:
                 current_factor += allocation

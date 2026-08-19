@@ -18,7 +18,10 @@ import numpy as np
 import polars as pl
 
 from modular_models.state_transition.context import StudyContext
-from modular_models.state_transition.engine import StateTransitionEngine, derive_event_rates
+from modular_models.state_transition.engine import (
+    StateTransitionEngine,
+    derive_event_rates,
+)
 from modular_models.state_transition.kernels import warm_jit_kernels
 from modular_models.state_transition.results import ComparisonResult
 from modular_models.state_transition.rewards import (
@@ -107,9 +110,13 @@ class PSAConfig:
         if self.iterations <= 0 or self.n_patients <= 0:
             raise ValueError("iterations and n_patients must be positive")
         if self.n_jobs < 0 or self.batch_size <= 0:
-            raise ValueError("n_jobs must be non-negative and batch_size must be positive")
+            raise ValueError(
+                "n_jobs must be non-negative and batch_size must be positive"
+            )
         if self.compute_backend == "cuda" and not cuda_available():
-            raise ValueError("CUDA backend requested but no usable CUDA device was found")
+            raise ValueError(
+                "CUDA backend requested but no usable CUDA device was found"
+            )
 
 
 @dataclass(frozen=True, slots=True)
@@ -125,9 +132,13 @@ class OWSAConfig:
 
     def validate(self) -> None:
         if self.n_patients <= 0 or self.n_jobs < 0:
-            raise ValueError("n_patients must be positive and n_jobs must be non-negative")
+            raise ValueError(
+                "n_patients must be positive and n_jobs must be non-negative"
+            )
         if self.compute_backend == "cuda" and not cuda_available():
-            raise ValueError("CUDA backend requested but no usable CUDA device was found")
+            raise ValueError(
+                "CUDA backend requested but no usable CUDA device was found"
+            )
 
 
 @dataclass(frozen=True, slots=True)
@@ -144,14 +155,18 @@ class PSAInnerLoopConfig:
     relative_mean_threshold: float = 0.01
 
     def validate(self) -> None:
-        if len(self.population_sizes) < 2 or any(size <= 0 for size in self.population_sizes):
+        if len(self.population_sizes) < 2 or any(
+            size <= 0 for size in self.population_sizes
+        ):
             raise ValueError("At least two positive population sizes are required")
         if tuple(sorted(set(self.population_sizes))) != self.population_sizes:
             raise ValueError("population_sizes must be unique and sorted")
         if self.iterations < 2:
             raise ValueError("At least two common PSA iterations are required")
         if self.n_jobs < 0 or self.batch_size <= 0:
-            raise ValueError("n_jobs must be non-negative and batch_size must be positive")
+            raise ValueError(
+                "n_jobs must be non-negative and batch_size must be positive"
+            )
         if not 0 < self.relative_mean_threshold < 1:
             raise ValueError("relative_mean_threshold must lie between zero and one")
 
@@ -163,11 +178,15 @@ def _now() -> str:
 def _atomic_json(path: Path, payload: dict[str, Any]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary = path.with_suffix(path.suffix + ".tmp")
-    temporary.write_text(json.dumps(payload, indent=2, ensure_ascii=False), encoding="utf-8")
+    temporary.write_text(
+        json.dumps(payload, indent=2, ensure_ascii=False), encoding="utf-8"
+    )
     os.replace(temporary, path)
 
 
-def _atomic_parquet(frame: pl.DataFrame, path: Path, compression: Compression = "zstd") -> None:
+def _atomic_parquet(
+    frame: pl.DataFrame, path: Path, compression: Compression = "zstd"
+) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary = path.with_suffix(".tmp.parquet")
     frame.write_parquet(temporary, compression=compression, statistics=True)
@@ -210,7 +229,9 @@ def _code_fingerprint() -> str:
     return digest.hexdigest()
 
 
-def _manifest_base(context: StudyContext, analysis: str, config: dict[str, Any]) -> dict[str, Any]:
+def _manifest_base(
+    context: StudyContext, analysis: str, config: dict[str, Any]
+) -> dict[str, Any]:
     return {
         "schema_version": _PIPELINE_SCHEMA_VERSION,
         "analysis": analysis,
@@ -267,7 +288,8 @@ def comparison_record(result: ComparisonResult) -> dict[str, float | int | bool 
         **_arm_record("prophylaxis", p),
         **_arm_record("on_demand", o),
         "mean_bleeds_avoided": bleeds_avoided,
-        "relative_bleed_reduction": bleeds_avoided / max(float(o["mean_total_bleeds"]), 1e-12),
+        "relative_bleed_reduction": bleeds_avoided
+        / max(float(o["mean_total_bleeds"]), 1e-12),
         "absolute_mortality_reduction": deaths_avoided,
         "relative_mortality_reduction": deaths_avoided
         / max(float(o["all_cause_mortality_probability"]), 1e-12),
@@ -400,9 +422,13 @@ class PSAProductionPipeline:
         if self.manifest_path.exists():
             manifest = json.loads(self.manifest_path.read_text(encoding="utf-8"))
             if manifest.get("schema_version") != _PIPELINE_SCHEMA_VERSION:
-                raise ValueError("Existing PSA run uses an incompatible pipeline schema")
+                raise ValueError(
+                    "Existing PSA run uses an incompatible pipeline schema"
+                )
             if manifest["config"] != self._config_payload():
-                raise ValueError("Existing PSA run configuration does not match the requested run")
+                raise ValueError(
+                    "Existing PSA run configuration does not match the requested run"
+                )
             if manifest["data_fingerprint_sha256"] != fingerprint:
                 raise ValueError("Model inputs changed after the PSA run was created")
             if manifest.get("code_fingerprint_sha256") != _code_fingerprint():
@@ -421,20 +447,28 @@ class PSAProductionPipeline:
                 "iteration": np.arange(self.config.iterations, dtype=np.int64),
                 "iteration_seed": np.array(
                     [
-                        int(np.random.SeedSequence([self.config.seed, index]).generate_state(1)[0])
+                        int(
+                            np.random.SeedSequence(
+                                [self.config.seed, index]
+                            ).generate_state(1)[0]
+                        )
                         for index in range(self.config.iterations)
                     ],
                     dtype=np.uint32,
                 ),
             }
             draw_data.update(sampled)
-            _atomic_parquet(pl.DataFrame(draw_data), self.draws_path, self.config.compression)
+            _atomic_parquet(
+                pl.DataFrame(draw_data), self.draws_path, self.config.compression
+            )
         return pl.read_parquet(self.draws_path), manifest
 
     def _completed(self) -> set[int]:
         completed: set[int] = set()
         for path in self.parts_dir.glob("psa_*.parquet"):
-            completed.update(pl.read_parquet(path, columns=["iteration"])["iteration"].to_list())
+            completed.update(
+                pl.read_parquet(path, columns=["iteration"])["iteration"].to_list()
+            )
         return completed
 
     def _execute(self, row: dict[str, Any], options: dict[str, Any]) -> dict[str, Any]:
@@ -463,8 +497,14 @@ class PSAProductionPipeline:
         _, options = self.resolver.deterministic(self.config.scenario_id)
         with _RunLock(self.run_dir / ".run.lock"):
             completed = self._completed()
-            pending = [index for index in range(self.config.iterations) if index not in completed]
-            manifest.update(status="running", updated_at_utc=_now(), completed=len(completed))
+            pending = [
+                index
+                for index in range(self.config.iterations)
+                if index not in completed
+            ]
+            manifest.update(
+                status="running", updated_at_utc=_now(), completed=len(completed)
+            )
             jobs = _effective_jobs(self.config.n_jobs)
             manifest["effective_jobs"] = jobs
             manifest["parallel_backend"] = "process" if jobs > 1 else "sequential"
@@ -498,8 +538,13 @@ class PSAProductionPipeline:
                     if executor is None:
                         records = [self._execute(row, options) for row in rows]
                     else:
-                        records = list(executor.map(_execute_psa_worker, rows, chunksize=1))
-                    part = self.parts_dir / f"psa_{min(indices):06d}_{max(indices):06d}.parquet"
+                        records = list(
+                            executor.map(_execute_psa_worker, rows, chunksize=1)
+                        )
+                    part = (
+                        self.parts_dir
+                        / f"psa_{min(indices):06d}_{max(indices):06d}.parquet"
+                    )
                     _atomic_parquet(pl.DataFrame(records).sort("iteration"), part)
                     completed.update(indices)
                     elapsed = time.perf_counter() - started
@@ -532,7 +577,9 @@ class PSAProductionPipeline:
         paths = sorted(self.parts_dir.glob("psa_*.parquet"))
         if not paths:
             return pl.DataFrame()
-        frame = pl.concat([pl.read_parquet(path) for path in paths], how="vertical_relaxed")
+        frame = pl.concat(
+            [pl.read_parquet(path) for path in paths], how="vertical_relaxed"
+        )
         frame = frame.unique(subset=["iteration"], keep="last").sort("iteration")
         _atomic_parquet(frame, self.results_path, self.config.compression)
         return frame
@@ -567,11 +614,15 @@ class OWSAProductionPipeline:
             ]
         )
         if not self.config.include_technical_parameters:
-            selected = [key for key in selected if key not in _TECHNICAL_OWSA_PARAMETERS]
+            selected = [
+                key for key in selected if key not in _TECHNICAL_OWSA_PARAMETERS
+            ]
         options = self.context.scenario(self.config.scenario_id).options
         if options.get("joint_rate_method") == "fraction":
             selected = [
-                key for key in selected if key not in {"ajbr_prophylaxis", "ajbr_on_demand"}
+                key
+                for key in selected
+                if key not in {"ajbr_prophylaxis", "ajbr_on_demand"}
             ]
         else:
             selected = [key for key in selected if key != "joint_bleed_fraction"]
@@ -587,7 +638,9 @@ class OWSAProductionPipeline:
             selected = [key for key in selected if key != "post_ich_mild_utility_cap"]
         return selected
 
-    def _task_spec(self, parameter_id: str, endpoint: str, value: float) -> dict[str, Any]:
+    def _task_spec(
+        self, parameter_id: str, endpoint: str, value: float
+    ) -> dict[str, Any]:
         overrides = {parameter_id: value}
         analysis_type = "one_way"
         linked_parameter_id: str | None = None
@@ -601,8 +654,12 @@ class OWSAProductionPipeline:
             "ajbr_on_demand",
         }:
             suffix = parameter_id.removeprefix("ajbr_")
-            strategy = Strategy.PROPHYLAXIS if suffix == "prophylaxis" else Strategy.ON_DEMAND
-            values, options = self.resolver.deterministic(self.config.scenario_id, overrides)
+            strategy = (
+                Strategy.PROPHYLAXIS if suffix == "prophylaxis" else Strategy.ON_DEMAND
+            )
+            values, options = self.resolver.deterministic(
+                self.config.scenario_id, overrides
+            )
             try:
                 derive_event_rates(values, options, strategy)
             except ValueError:
@@ -686,10 +743,16 @@ class OWSAProductionPipeline:
         if self.manifest_path.exists():
             manifest = json.loads(self.manifest_path.read_text(encoding="utf-8"))
             if manifest.get("schema_version") != _PIPELINE_SCHEMA_VERSION:
-                raise ValueError("Existing OWSA run uses an incompatible pipeline schema")
+                raise ValueError(
+                    "Existing OWSA run uses an incompatible pipeline schema"
+                )
             if manifest["config"] != self._config_payload():
-                raise ValueError("Existing OWSA configuration does not match the requested run")
-            if manifest["data_fingerprint_sha256"] != _data_fingerprint(self.context.data_dir):
+                raise ValueError(
+                    "Existing OWSA configuration does not match the requested run"
+                )
+            if manifest["data_fingerprint_sha256"] != _data_fingerprint(
+                self.context.data_dir
+            ):
                 raise ValueError("Model inputs changed after the OWSA run was created")
             if manifest.get("code_fingerprint_sha256") != _code_fingerprint():
                 raise ValueError("Model code changed after the OWSA run was created")
@@ -700,14 +763,18 @@ class OWSAProductionPipeline:
 
         with _RunLock(self.run_dir / ".run.lock"):
             completed = {
-                path.stem.removeprefix("owsa_") for path in self.parts_dir.glob("*.parquet")
+                path.stem.removeprefix("owsa_")
+                for path in self.parts_dir.glob("*.parquet")
             }
             pending = [
                 task
                 for task in tasks
-                if str(cast(dict[str, Any], task["metadata"])["task_id"]) not in completed
+                if str(cast(dict[str, Any], task["metadata"])["task_id"])
+                not in completed
             ]
-            manifest.update(status="running", completed=len(completed), updated_at_utc=_now())
+            manifest.update(
+                status="running", completed=len(completed), updated_at_utc=_now()
+            )
             jobs = _effective_jobs(self.config.n_jobs)
             manifest["effective_jobs"] = jobs
             manifest["parallel_backend"] = "process" if jobs > 1 else "sequential"
@@ -753,8 +820,12 @@ class OWSAProductionPipeline:
                     executor.shutdown()
 
             paths = sorted(self.parts_dir.glob("owsa_*.parquet"))
-            frame = pl.concat([pl.read_parquet(path) for path in paths], how="diagonal_relaxed")
-            frame = frame.unique(subset=["task_id"], keep="last").sort(["parameter_id", "endpoint"])
+            frame = pl.concat(
+                [pl.read_parquet(path) for path in paths], how="diagonal_relaxed"
+            )
+            frame = frame.unique(subset=["task_id"], keep="last").sort(
+                ["parameter_id", "endpoint"]
+            )
             if "status" in frame.columns:
                 frame = frame.with_columns(
                     pl.when(

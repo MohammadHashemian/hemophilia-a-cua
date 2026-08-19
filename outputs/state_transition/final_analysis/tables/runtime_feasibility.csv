@@ -1,4 +1,0 @@
-run,iterations,patients_per_strategy,worker_processes,backend,elapsed_minutes,status
-CPU benchmark,24,5000,12,CPU JIT process pool,0.3117415450000408,complete
-CUDA benchmark,24,5000,8,CUDA FP64 reward kernel,0.45679823333327174,complete
-Final PSA,2500,5000,12,CPU JIT process pool,25.45324306499994,complete
