@@ -551,6 +551,11 @@ class StateTransitionEngine:
                             if event is AcuteEvent.NON_ICH_MAJOR
                             else "ich_iu_per_kg"
                         )
+                        treatment_duration_value = (
+                            float(self.values["non_ich_major_treatment_duration_days"])
+                            if event is AcuteEvent.NON_ICH_MAJOR
+                            else float(self.values["ich_duration_days"])
+                        )
                         total_iu = np.full(n, weight * self.values[dose_key])
                         self._allocate_major_course(
                             factor_cycle,
@@ -558,7 +563,7 @@ class StateTransitionEngine:
                             total_iu,
                             45.0 / self.values[dose_key],
                             onset,
-                            duration_value,
+                            treatment_duration_value,
                             active,
                             death_time,
                         )

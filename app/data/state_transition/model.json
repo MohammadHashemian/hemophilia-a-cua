@@ -103,7 +103,7 @@
     "utility_integration_step_days": {
       "id": "utility_integration_step_days",
       "description": "Numerical grid for within-cycle utility integration",
-      "value": 1.0,
+      "value": 0.25,
       "unit": "day",
       "assumption": "Daily grid with fractional edge weighting on a 364 model-day year; 0.25 day is retained for a numerical-precision check.",
       "owsa": {
@@ -843,6 +843,16 @@
           "high": 10
         }
       }
+    },
+    "non_ich_major_treatment_duration_days": {
+      "id": "non_ich_major_treatment_duration_days",
+      "description": "FVIII treatment course length for non-ICH major bleed",
+      "value": 10,
+      "unit": "day/event",
+      "references": [
+        "ref_54"
+      ],
+      "assumption": "WFH hemostatic coverage duration for non-ICH major bleeds; distinct from the acute utility effect duration."
     },
     "ich_acute_utility_cap": {
       "id": "ich_acute_utility_cap",

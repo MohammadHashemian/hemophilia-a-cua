@@ -52,6 +52,7 @@ class StudyContext:
 
     @classmethod
     def load(cls, data_dir: str | Path | None = None) -> StudyContext:
+        """Load predefined model data from JSON files and validate it."""
         root = (
             Path(data_dir)
             if data_dir is not None
@@ -60,8 +61,12 @@ class StudyContext:
         root = root.resolve()
         try:
             model = ModelFile.model_validate(_read_json(root / "model.json"))
-            ref_file = ReferenceFile.model_validate(_read_json(root / "references.json"))
-            scenario_file = ScenarioFile.model_validate(_read_json(root / "scenarios.json"))
+            ref_file = ReferenceFile.model_validate(
+                _read_json(root / "references.json")
+            )
+            scenario_file = ScenarioFile.model_validate(
+                _read_json(root / "scenarios.json")
+            )
         except ValidationError as exc:
             raise ContextValidationError(str(exc)) from exc
 
@@ -87,7 +92,9 @@ class StudyContext:
             referenced.update(parameter.references)
         for scenario in scenarios.values():
             referenced.update(scenario.references)
-            unknown_parameters = set(scenario.parameter_overrides).difference(model.parameters)
+            unknown_parameters = set(scenario.parameter_overrides).difference(
+                model.parameters
+            )
             if unknown_parameters:
                 raise ContextValidationError(
                     f"Scenario {scenario.id!r} overrides unknown parameters: "
@@ -139,6 +146,7 @@ class StudyContext:
             "minor_bleed_duration_days",
             "non_ich_major_utility_cap",
             "non_ich_major_duration_days",
+            "non_ich_major_treatment_duration_days",
             "ich_acute_utility_cap",
             "ich_duration_days",
             "post_ich_utility_cap",
@@ -151,7 +159,9 @@ class StudyContext:
         }
         missing = required.difference(model.parameters)
         if missing:
-            raise ContextValidationError(f"Required parameters are missing: {sorted(missing)}")
+            raise ContextValidationError(
+                f"Required parameters are missing: {sorted(missing)}"
+            )
 
     def parameter(self, parameter_id: str) -> ParameterSpec:
         try:

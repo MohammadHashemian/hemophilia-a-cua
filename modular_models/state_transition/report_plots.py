@@ -233,3 +233,280 @@ def plot_calibration(frame: pl.DataFrame, ax: Any = None) -> Any:
     target.legend(frameon=False)
     target.grid(alpha=0.2)
     return target
+
+
+# ---------------------------------------------------------------------------
+# Notebook-side plot helpers
+# ---------------------------------------------------------------------------
+
+
+def plot_inmb_threshold(
+    delta_qaly: float,
+    delta_cost: float,
+    primary_wtp: float,
+    *,
+    wtp_max_irr: float = 300_000_000_000.0,
+    n_points: int = 301,
+    ax: Any = None,
+) -> Any:
+    """Deterministic INMB across a dense WTP grid with primary and break-even markers."""
+    delta_qaly = float(delta_qaly)
+    delta_cost = float(delta_cost)
+    primary_wtp = float(primary_wtp)
+    wtp_grid = np.linspace(0.0, float(wtp_max_irr), int(n_points))
+    inmb_grid = wtp_grid * delta_qaly - delta_cost
+    break_even_wtp = delta_cost / delta_qaly if delta_qaly > 0 else float("nan")
+
+    target = ax or plt.subplots(figsize=(9, 5.8))[1]
+    target.plot(
+        wtp_grid / 1e9,
+        inmb_grid / 1e9,
+        linewidth=2.2,
+        label="Incremental NMB",
+    )
+    target.axhline(0, linestyle="--", linewidth=1.3, label="INMB = 0")
+    target.axvline(
+        primary_wtp / 1e9,
+        linestyle=":",
+        linewidth=1.5,
+        label=f"Primary WTP = {primary_wtp / 1e9:.0f} billion IRR/QALY",
+    )
+    target.axvline(
+        break_even_wtp / 1e9,
+        linestyle="-.",
+        linewidth=1.5,
+        label=f"Break-even WTP = {break_even_wtp / 1e9:.1f} billion IRR/QALY",
+    )
+    target.scatter([break_even_wtp / 1e9], [0], s=55, zorder=5)
+    target.annotate(
+        f"Break-even\n{break_even_wtp / 1e9:.1f} billion",
+        xy=(break_even_wtp / 1e9, 0),
+        xytext=(12, 18),
+        textcoords="offset points",
+        ha="left",
+    )
+    target.set_xlabel("Willingness-to-pay threshold (billion IRR/QALY)")
+    target.set_ylabel(
+        "Incremental net monetary benefit (billion IRR/patient)"
+    )
+    target.set_title(
+        "Deterministic incremental net monetary benefit "
+        "across willingness-to-pay thresholds"
+    )
+    target.legend(frameon=False, loc="best")
+    target.grid(alpha=0.2)
+    return target
+
+
+def plot_scenario_nmb_bars(scenario_table: pl.DataFrame, ax: Any = None) -> Any:
+    """Vertical bar chart of incremental NMB for each structural scenario."""
+    target = ax or plt.subplots(figsize=(10, 5.5))[1]
+    labels = scenario_table["scenario"].to_list()
+    values = scenario_table["incremental_nmb_irr"].to_numpy() / 1e9
+    bars = target.bar(labels, values)
+    target.bar_label(bars, fmt="%.2f", padding=3)
+    target.axhline(0, color="0.35", linewidth=0.9)
+    target.set_ylabel("Incremental NMB (billion IRR)")
+    target.set_title("Structural scenario analysis")
+    target.tick_params(axis="x", rotation=30)
+    return target
+
+
+def plot_inner_loop_precision(
+    precision_plot: pl.DataFrame,
+    *,
+    threshold_percent: float = 10.0,
+    ax: Any = None,
+) -> Any:
+    """Paired-QALY-noise vs population size for the inner-loop diagnostic."""
+    target = ax or plt.subplots(figsize=(8.5, 5.2))[1]
+    target.plot(
+        precision_plot["n_patients_per_strategy"],
+        precision_plot["qaly_noise_ratio_percent"],
+        marker="o",
+        linewidth=2,
+        label="Paired QALY noise / parameter SD",
+    )
+    for row in precision_plot.iter_rows(named=True):
+        target.annotate(
+            f"{row['qaly_noise_ratio_percent']:.1f}%",
+            (row["n_patients_per_strategy"], row["qaly_noise_ratio_percent"]),
+            xytext=(0, 8),
+            textcoords="offset points",
+            ha="center",
+        )
+    target.axhline(
+        threshold_percent,
+        color="0.3",
+        linestyle="--",
+        label=f"{threshold_percent:.0f}% diagnostic threshold",
+    )
+    target.set_xlabel("Patients per strategy within each PSA draw")
+    target.set_ylabel("First-order QALY noise / between-parameter SD (%)")
+    target.set_title("Paired PSA inner-loop precision")
+    target.legend(frameon=False)
+    target.grid(alpha=0.2)
+    return target
+
+
+def plot_psa_convergence(
+    convergence_plot: pl.DataFrame,
+    *,
+    threshold_percent: float = 1.0,
+    title: str = "Second-order PSA convergence",
+    ax: Any = None,
+) -> Any:
+    """Change in mean incremental cost/QALY vs cumulative PSA draws."""
+    target = ax or plt.subplots(figsize=(9, 5.5))[1]
+    target.plot(
+        convergence_plot["iterations"],
+        convergence_plot["relative_change_mean_cost"] * 100,
+        marker="o",
+        label="Mean incremental cost",
+    )
+    target.plot(
+        convergence_plot["iterations"],
+        convergence_plot["relative_change_mean_qaly"] * 100,
+        marker="s",
+        label="Mean incremental QALY",
+    )
+    target.axhline(
+        threshold_percent,
+        color="0.3",
+        linestyle="--",
+        label=f"{threshold_percent:.0f}% change threshold",
+    )
+    target.set_xlabel("Cumulative second-order PSA draws")
+    target.set_ylabel("Change from preceding checkpoint (%)")
+    target.set_title(title)
+    target.legend(frameon=False)
+    target.grid(alpha=0.2)
+    return target
+
+
+def plot_evpi(
+    wtp_grid: np.ndarray,
+    evpi_values: np.ndarray,
+    primary_wtp: float,
+    ax: Any = None,
+) -> Any:
+    """EVPI curve with primary-WTP marker and the maximum-EVPI annotation."""
+    target = ax or plt.subplots(figsize=(9, 5.8))[1]
+    target.plot(
+        np.asarray(wtp_grid) / 1e9,
+        np.asarray(evpi_values) / 1e9,
+        linewidth=2.2,
+    )
+    target.axvline(
+        float(primary_wtp) / 1e9,
+        linestyle="--",
+        linewidth=1.3,
+        label=f"Primary WTP = {float(primary_wtp) / 1e9:.0f} billion IRR/QALY",
+    )
+    max_idx = int(np.argmax(np.asarray(evpi_values)))
+    target.scatter(
+        [float(wtp_grid[max_idx]) / 1e9],
+        [float(evpi_values[max_idx]) / 1e9],
+        s=55,
+        zorder=5,
+    )
+    target.annotate(
+        (
+            f"Maximum EVPI\n"
+            f"{float(evpi_values[max_idx]) / 1e9:.2f} "
+            f"billion IRR/patient"
+        ),
+        xy=(
+            float(wtp_grid[max_idx]) / 1e9,
+            float(evpi_values[max_idx]) / 1e9,
+        ),
+        xytext=(15, -15),
+        textcoords="offset points",
+    )
+    target.set_xlabel("Willingness-to-pay threshold (billion IRR/QALY)")
+    target.set_ylabel("EVPI (billion IRR/patient)")
+    target.set_title("Expected Value of Perfect Information")
+    target.legend(frameon=False)
+    target.grid(alpha=0.2)
+    return target
+
+
+def plot_factor_price_policy(
+    factor_price_psa: pl.DataFrame,
+    base_price_irr_per_iu: float,
+    break_even_price_irr_per_iu: float,
+    ax: Any = None,
+) -> Any:
+    """Cost-effectiveness probability versus FVIII unit price."""
+    target = ax or plt.subplots(figsize=(9, 5.8))[1]
+    target.plot(
+        factor_price_psa["factor_price_irr_per_iu"].to_numpy(),
+        factor_price_psa["probability_cost_effective"].to_numpy() * 100.0,
+        linewidth=2.2,
+    )
+    target.axvline(
+        float(base_price_irr_per_iu),
+        linestyle="--",
+        linewidth=1.3,
+        label=f"Base price = {float(base_price_irr_per_iu):,.0f} IRR/IU",
+    )
+    target.axvline(
+        float(break_even_price_irr_per_iu),
+        linestyle=":",
+        linewidth=1.5,
+        label=(
+            f"Deterministic break-even = "
+            f"{float(break_even_price_irr_per_iu):,.0f} IRR/IU"
+        ),
+    )
+    target.axhline(50, linestyle="-.", linewidth=1.1, label="50% probability")
+    target.set_xlabel("FVIII unit price (IRR/IU)")
+    target.set_ylabel("Probability prophylaxis is cost-effective (%)")
+    target.set_title("Cost-effectiveness probability across FVIII prices")
+    target.legend(frameon=False)
+    target.grid(alpha=0.2)
+    return target
+
+
+def plot_monte_carlo_convergence(
+    convergence_table: pl.DataFrame, ax: Any = None
+) -> Any:
+    """Relative change in incremental cost and QALY across cohort sizes."""
+    target = ax or plt.subplots(figsize=(8, 5))[1]
+    plot_data = convergence_table.filter(
+        pl.col("relative_change_cost").is_not_null()
+    )
+    target.plot(
+        plot_data["n_patients"],
+        plot_data["relative_change_cost"] * 100,
+        marker="o",
+        label="Incremental cost",
+    )
+    target.plot(
+        plot_data["n_patients"],
+        plot_data["relative_change_qaly"] * 100,
+        marker="s",
+        label="Incremental QALY",
+    )
+    for row in plot_data.iter_rows(named=True):
+        target.annotate(
+            f"{row['relative_change_cost'] * 100:.4f}%",
+            (row["n_patients"], row["relative_change_cost"] * 100),
+            xytext=(0, 8),
+            textcoords="offset points",
+            ha="center",
+        )
+        target.annotate(
+            f"{row['relative_change_qaly'] * 100:.3f}%",
+            (row["n_patients"], row["relative_change_qaly"] * 100),
+            xytext=(0, 8),
+            textcoords="offset points",
+            ha="center",
+        )
+    target.axhline(1.0, color="0.35", linestyle="--", label="1% threshold")
+    target.set_xlabel("Patients per strategy")
+    target.set_ylabel("Relative change from preceding size (%)")
+    target.set_title("First-order Monte Carlo convergence")
+    target.legend(frameon=False)
+    target.grid(alpha=0.2)
+    return target

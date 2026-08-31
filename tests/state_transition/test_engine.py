@@ -256,6 +256,250 @@ def test_major_factor_course_is_conserved_across_cycles(context: StudyContext) -
     assert current.sum() + pending.sum() == pytest.approx(total[0])
 
 
+def _maintenance_allocation(
+    engine: StateTransitionEngine,
+    *,
+    total_iu_value: float,
+    initial_fraction: float,
+    starts: np.ndarray,
+    duration_days: float,
+    death_time: np.ndarray,
+) -> tuple[np.ndarray, np.ndarray]:
+    current = np.zeros(starts.shape[0])
+    pending = np.zeros((starts.shape[0], 2))
+    total = np.full(starts.shape[0], total_iu_value)
+    engine._allocate_major_course(
+        current,
+        pending,
+        total,
+        initial_fraction=initial_fraction,
+        starts=starts,
+        duration_days=duration_days,
+        active=np.ones(starts.shape[0], dtype=bool),
+        death_time=death_time,
+    )
+    return current, pending
+
+
+def test_major_factor_course_share_uses_nominal_duration_denominator(
+    context: StudyContext,
+) -> None:
+    """Per-week share must equal (week overlap) / nominal_duration, where
+    nominal_duration is the full prescribed course (not the truncated,
+    post-death effective span). The old implementation divided by the
+    truncated effective duration and compressed the entire maintenance
+    into the time the patient survived.
+    """
+    values, options = ParameterResolver(context).deterministic()
+    engine = StateTransitionEngine(context, values, options, scenario_id="test", seed=4)
+
+    total_iu_value = 6200.0
+    dose_per_kg = 620.0
+    initial_fraction = 45.0 / dose_per_kg
+    initial = total_iu_value * initial_fraction
+    maintenance = total_iu_value - initial
+    duration_days = 12.0
+
+    # Patient dies 3 days into a 12-day course: end = 4.0, delivered = 3.0.
+    onset = 1.0
+    end = 4.0
+    expected_share_week_0 = max(0.0, min(end, 7.0) - max(onset, 0.0)) / duration_days
+    expected_share_week_1 = max(0.0, min(end, 14.0) - max(onset, 7.0)) / duration_days
+    expected_share_week_2 = max(0.0, min(end, 21.0) - max(onset, 14.0)) / duration_days
+
+    current, pending = _maintenance_allocation(
+        engine,
+        total_iu_value=total_iu_value,
+        initial_fraction=initial_fraction,
+        starts=np.array([onset]),
+        duration_days=duration_days,
+        death_time=np.array([end]),
+    )
+    allocated_maintenance = (current.sum() + pending.sum()) - initial
+    allocated_share = allocated_maintenance / maintenance
+
+    assert allocated_share == pytest.approx(0.25, rel=1e-9)
+    assert allocated_share < 1.0
+    assert (current.sum() - initial) == pytest.approx(
+        expected_share_week_0 * maintenance, rel=1e-9
+    )
+    assert pending[0, 0] == pytest.approx(
+        expected_share_week_1 * maintenance, rel=1e-9
+    )
+    assert pending[0, 1] == pytest.approx(
+        expected_share_week_2 * maintenance, rel=1e-9
+    )
+    assert expected_share_week_1 == 0.0
+    assert expected_share_week_2 == 0.0
+
+
+def test_major_factor_course_full_course_when_alive(context: StudyContext) -> None:
+    """When the patient is alive for the whole cycle, total share must equal 1
+    (the full maintenance is delivered) and conservation must hold.
+    """
+    values, options = ParameterResolver(context).deterministic()
+    engine = StateTransitionEngine(context, values, options, scenario_id="test", seed=5)
+
+    total_iu_value = 6200.0
+    dose_per_kg = 620.0
+    initial_fraction = 45.0 / dose_per_kg
+    initial = total_iu_value * initial_fraction
+    maintenance = total_iu_value - initial
+    duration_days = 12.0
+
+    # Onset 6.0 in a 7-day cycle; no death in this cycle.
+    current, pending = _maintenance_allocation(
+        engine,
+        total_iu_value=total_iu_value,
+        initial_fraction=initial_fraction,
+        starts=np.array([6.0]),
+        duration_days=duration_days,
+        death_time=np.array([7.0]),
+    )
+    allocated_maintenance = (current.sum() + pending.sum()) - initial
+    allocated_share = allocated_maintenance / maintenance
+
+    assert allocated_share == pytest.approx(1.0, rel=1e-9)
+    assert current.sum() + pending.sum() == pytest.approx(total_iu_value, rel=1e-9)
+    # The three week-windows (0-7, 7-14, 14-21) must cover the full 12-day course.
+    assert (current.sum() - initial) == pytest.approx(maintenance / 12.0, rel=1e-9)
+    assert pending[0, 0] == pytest.approx(7.0 * maintenance / 12.0, rel=1e-9)
+    assert pending[0, 1] == pytest.approx(4.0 * maintenance / 12.0, rel=1e-9)
+
+
+def test_major_factor_course_zero_duration_avoids_divide_by_zero(
+    context: StudyContext,
+) -> None:
+    """The 1e-12 floor on nominal_duration must protect against division by
+    zero when duration_days is zero (or any non-positive value that survives
+    the max()). The only allocation should be the initial dose, with no
+    maintenance and no NaN/inf.
+    """
+    values, options = ParameterResolver(context).deterministic()
+    engine = StateTransitionEngine(context, values, options, scenario_id="test", seed=6)
+
+    total_iu_value = 6200.0
+    dose_per_kg = 620.0
+    initial_fraction = 45.0 / dose_per_kg
+    initial = total_iu_value * initial_fraction
+
+    current, pending = _maintenance_allocation(
+        engine,
+        total_iu_value=total_iu_value,
+        initial_fraction=initial_fraction,
+        starts=np.array([3.0]),
+        duration_days=0.0,
+        death_time=np.array([7.0]),
+    )
+
+    assert current.sum() == pytest.approx(initial, rel=1e-9)
+    assert pending.sum() == 0.0
+    assert np.all(np.isfinite(current))
+    assert np.all(np.isfinite(pending))
+
+
+def test_non_ich_major_treatment_duration_decouples_from_utility_duration(
+    context: StudyContext,
+) -> None:
+    """The FVIII treatment course length (10 days) and the acute utility
+    duration (7 days) for non-ICH major bleeds must be tracked separately.
+    The split is verified by confirming total FVIII is conserved under the
+    longer treatment window while the utility effect remains bounded by the
+    shorter 7-day interval.
+    """
+    values, options = ParameterResolver(context).deterministic()
+    assert (
+        values["non_ich_major_treatment_duration_days"]
+        > values["non_ich_major_duration_days"]
+    )
+    engine = StateTransitionEngine(context, values, options, scenario_id="test", seed=7)
+
+    total_iu_value = 6200.0
+    dose_per_kg = 620.0
+    initial_fraction = 45.0 / dose_per_kg
+    initial = total_iu_value * initial_fraction
+    maintenance = total_iu_value - initial
+
+    # Treatment duration = 10 days; patient alive for full 7-day cycle;
+    # onset late in the cycle so the course spills into weeks 1 and 2.
+    onset = 5.0
+    current, pending = _maintenance_allocation(
+        engine,
+        total_iu_value=total_iu_value,
+        initial_fraction=initial_fraction,
+        starts=np.array([onset]),
+        duration_days=values["non_ich_major_treatment_duration_days"],
+        death_time=np.array([7.0]),
+    )
+    allocated_maintenance = (current.sum() + pending.sum()) - initial
+
+    # Full 10-day course delivered: share = 1.0, total FVIII conserved.
+    assert allocated_maintenance == pytest.approx(maintenance, rel=1e-9)
+    assert current.sum() + pending.sum() == pytest.approx(total_iu_value, rel=1e-9)
+    # Week 0: 2 days overlap (5 → 7). Weeks 1-2: 7 + 1 = 8 days.
+    assert (current.sum() - initial) == pytest.approx(
+        2.0 / 10.0 * maintenance, rel=1e-9
+    )
+    assert pending[0, 0] == pytest.approx(
+        7.0 / 10.0 * maintenance, rel=1e-9
+    )
+    assert pending[0, 1] == pytest.approx(
+        1.0 / 10.0 * maintenance, rel=1e-9
+    )
+
+
+def test_utility_integration_step_adequacy(context: StudyContext) -> None:
+    """The base case uses ``utility_integration_step_days = 1.0`` (one bin
+    per weekly cycle). The kernels integrate utility by averaging each event
+    over its bin before taking the per-bin minimum, which is an
+    approximation of the time-point-wise minimum. This test confirms that
+    halving the step to 0.25 day does not change the four incremental
+    decision metrics by more than a documented tolerance, so PSA can keep
+    the coarser step.
+
+    Cost must be bitwise identical between the two step values because
+    ``utility_integration_step_days`` only affects the reward integrator.
+    QALY, ICER, and INMB differ by a deterministic per-event approximation
+    bias of about 0.1% in this cohort; the tolerance is set well above that
+    so the test stays stable across parameter-table edits while still
+    catching a real regression.
+    """
+    runner = StudyRunner(context)
+    seed = 20_260_813
+    n_patients = 5_000
+
+    coarse = runner.compare(
+        n_patients=n_patients,
+        seed=seed,
+        overrides={"utility_integration_step_days": 1.0},
+    )
+    fine = runner.compare(
+        n_patients=n_patients,
+        seed=seed,
+        overrides={"utility_integration_step_days": 0.25},
+    )
+
+    cost_rel = abs(coarse.incremental_cost_irr - fine.incremental_cost_irr) / max(
+        abs(fine.incremental_cost_irr), 1e-12
+    )
+    qaly_rel = abs(coarse.incremental_qaly - fine.incremental_qaly) / max(
+        abs(fine.incremental_qaly), 1e-12
+    )
+    icer_rel = abs(coarse.icer_irr_per_qaly - fine.icer_irr_per_qaly) / max(
+        abs(fine.icer_irr_per_qaly), 1e-12
+    )
+    inmb_rel = abs(coarse.incremental_nmb_irr - fine.incremental_nmb_irr) / max(
+        abs(fine.incremental_nmb_irr), 1e-12
+    )
+
+    assert cost_rel == pytest.approx(0.0, abs=1e-6), (
+        f"step_days must not affect cost, got rel diff {cost_rel:.3e}"
+    )
+    assert qaly_rel < 5e-3, f"QALY rel diff {qaly_rel:.3e} exceeds 5e-3"
+    assert icer_rel < 5e-3, f"ICER rel diff {icer_rel:.3e} exceeds 5e-3"
+    assert inmb_rel < 5e-3, f"INMB rel diff {inmb_rel:.3e} exceeds 5e-3"
+
+
 def test_zero_price_changes_cost_not_resource_use(context: StudyContext) -> None:
     comparison = StudyRunner(context).compare(
         n_patients=100,

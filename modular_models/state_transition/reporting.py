@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import json
 from collections.abc import Mapping
+from pathlib import Path
 from typing import Any, cast
 
 import numpy as np
@@ -401,3 +403,594 @@ def cost_effectiveness_quadrants(frame: pl.DataFrame) -> pl.DataFrame:
             for label, mask in labels.items()
         ]
     )
+
+
+# ---------------------------------------------------------------------------
+# Base-case economic summary and WTP sensitivity
+# ---------------------------------------------------------------------------
+
+
+def economic_summary_table(comparison: ComparisonResult) -> pl.DataFrame:
+    """Per-arm mean cost, QALY, ICER and INMB at the supplied WTP threshold."""
+    p = comparison.prophylaxis.summary
+    o = comparison.on_demand.summary
+    return pl.DataFrame(
+        [
+            {
+                "metric": "Cost - prophylaxis",
+                "value": float(p["mean_cost_irr"]),
+                "unit": "IRR/patient",
+            },
+            {
+                "metric": "Cost - on demand",
+                "value": float(o["mean_cost_irr"]),
+                "unit": "IRR/patient",
+            },
+            {
+                "metric": "Incremental cost",
+                "value": comparison.incremental_cost_irr,
+                "unit": "IRR/patient",
+            },
+            {
+                "metric": "Incremental QALY",
+                "value": comparison.incremental_qaly,
+                "unit": "QALY/patient",
+            },
+            {
+                "metric": "ICER",
+                "value": comparison.icer_irr_per_qaly,
+                "unit": "IRR/QALY",
+            },
+            {
+                "metric": "Incremental NMB",
+                "value": comparison.incremental_nmb_irr,
+                "unit": "IRR/patient",
+            },
+        ]
+    )
+
+
+def wtp_sensitivity_table(
+    delta_cost: float, delta_qaly: float, wtp_values: np.ndarray
+) -> pl.DataFrame:
+    """INMB and the preferred strategy at each supplied WTP value."""
+    wtp_values = np.asarray(wtp_values, dtype=float)
+    delta_cost = float(delta_cost)
+    delta_qaly = float(delta_qaly)
+    inmb = wtp_values * delta_qaly - delta_cost
+    return pl.DataFrame(
+        {
+            "wtp_irr_per_qaly": wtp_values,
+            "incremental_nmb_irr": inmb,
+        }
+    ).with_columns(
+        pl.when(pl.col("incremental_nmb_irr") > 0)
+        .then(pl.lit("Prophylaxis"))
+        .when(pl.col("incremental_nmb_irr") < 0)
+        .then(pl.lit("On-demand"))
+        .otherwise(pl.lit("Break-even"))
+        .alias("preferred_strategy")
+    )
+
+
+def wtp_threshold_summary(
+    delta_cost: float, delta_qaly: float, primary_wtp: float
+) -> pl.DataFrame:
+    """Deterministic break-even WTP and the ratio to the primary threshold."""
+    delta_cost = float(delta_cost)
+    delta_qaly = float(delta_qaly)
+    primary_wtp = float(primary_wtp)
+    break_even = delta_cost / delta_qaly if delta_qaly > 0 else float("nan")
+    return pl.DataFrame(
+        [
+            {
+                "incremental_cost_irr": delta_cost,
+                "incremental_qaly": delta_qaly,
+                "primary_wtp_irr_per_qaly": primary_wtp,
+                "break_even_wtp_irr_per_qaly": break_even,
+                "break_even_wtp_billion_irr_per_qaly": break_even / 1e9,
+                "primary_wtp_as_fraction_of_break_even": primary_wtp / break_even,
+                "break_even_to_primary_wtp_ratio": break_even / primary_wtp,
+            }
+        ]
+    )
+
+
+# ---------------------------------------------------------------------------
+# Extended patient-level validation
+# ---------------------------------------------------------------------------
+
+
+def extended_validation_table(comparison: ComparisonResult) -> pl.DataFrame:
+    """Patient-level invariant audit that requires retained patient records."""
+    rows: list[dict[str, Any]] = []
+    for result in (comparison.prophylaxis, comparison.on_demand):
+        frame = result.to_polars(patient_level=True)
+        strategy = result.strategy.value
+        summary = result.summary
+
+        calculated_mean_total_bleeds = float(
+            frame.select(
+                (
+                    pl.col("joint_bleeds")
+                    + pl.col("non_major_non_joint_bleeds")
+                    + pl.col("non_ich_major_bleeds")
+                    + pl.col("ich_events")
+                ).mean().alias("mean_total")
+            )["mean_total"][0]
+        )
+
+        rows.extend(
+            [
+                {
+                    "strategy": strategy,
+                    "check": "pettersson_within_0_78",
+                    "passed": bool(
+                        frame["pettersson_score"].min() >= 0
+                        and frame["pettersson_score"].max() <= 78
+                    ),
+                },
+                {
+                    "strategy": strategy,
+                    "check": "patient_qaly_non_negative",
+                    "passed": bool((frame["total_qaly"] >= 0).all()),
+                },
+                {
+                    "strategy": strategy,
+                    "check": "patient_qaly_not_above_life_years",
+                    "passed": bool(
+                        (frame["total_qaly"] <= frame["life_years"] + 1e-10).all()
+                    ),
+                },
+                {
+                    "strategy": strategy,
+                    "check": "patient_cost_non_negative",
+                    "passed": bool((frame["total_cost_irr"] >= 0).all()),
+                },
+                {
+                    "strategy": strategy,
+                    "check": "patient_factor_non_negative",
+                    "passed": bool((frame["total_factor_iu"] >= 0).all()),
+                },
+                {
+                    "strategy": strategy,
+                    "check": "bleed_components_reconcile",
+                    "passed": bool(
+                        np.isclose(
+                            calculated_mean_total_bleeds,
+                            float(summary["mean_total_bleeds"]),
+                            rtol=0,
+                            atol=1e-10,
+                        )
+                    ),
+                },
+            ]
+        )
+    return pl.DataFrame(rows)
+
+
+# ---------------------------------------------------------------------------
+# Auditable patient and cycle samples
+# ---------------------------------------------------------------------------
+
+
+def auditable_patient_sample(comparison: ComparisonResult, n: int = 10) -> pl.DataFrame:
+    """Top-N on-demand patients by joint-bleed count with end-of-horizon outcomes."""
+    return (
+        comparison.on_demand.to_polars(patient_level=True)
+        .sort("joint_bleeds", descending=True)
+        .head(n)
+        .select(
+            "patient_id",
+            "life_years",
+            "total_qaly",
+            "total_cost_irr",
+            "total_factor_iu",
+            "joint_bleeds",
+            "non_major_non_joint_bleeds",
+            "non_ich_major_bleeds",
+            "ich_events",
+            "pettersson_score",
+            "ever_post_ich",
+            "death_cause",
+            "death_age_years",
+            "final_state",
+        )
+    )
+
+
+def auditable_cycle_sample(trace_json_path: Path, run_index: int = 1) -> pl.DataFrame:
+    """Read the trace JSON and return the per-cycle record of the chosen strategy run."""
+    payload = json.loads(Path(trace_json_path).read_text(encoding="utf-8"))
+    return pl.DataFrame(payload["runs"][run_index]["cycles"])
+
+
+# ---------------------------------------------------------------------------
+# CEAC helpers
+# ---------------------------------------------------------------------------
+
+
+def selected_ceac_table(
+    ceac: pl.DataFrame, wtp_billion_values: list[float]
+) -> pl.DataFrame:
+    """Return the CEAC rows whose WTP (in billion IRR/QALY) matches any input value."""
+    annotated = ceac.with_columns(
+        (pl.col("wtp_irr_per_qaly") / 1e9).alias("wtp_billion_irr_per_qaly")
+    )
+    return annotated.filter(pl.col("wtp_billion_irr_per_qaly").is_in(wtp_billion_values))
+
+
+def exact_ceac_table(
+    psa_frame: pl.DataFrame, wtp_values: np.ndarray, primary_wtp: float
+) -> pl.DataFrame:
+    """Probability cost-effective computed exactly at each WTP using PSA draws."""
+    wtp_values = np.asarray(wtp_values, dtype=float)
+    primary_wtp = float(primary_wtp)
+    rows: list[dict[str, Any]] = []
+    inmb_at_primary = psa_frame["incremental_nmb_irr"].to_numpy()
+    qaly = psa_frame["incremental_qaly"].to_numpy()
+    for wtp in wtp_values:
+        shifted_inmb = inmb_at_primary + (wtp - primary_wtp) * qaly
+        rows.append(
+            {
+                "wtp_billion_irr_per_qaly": wtp / 1e9,
+                "probability_prophylaxis_cost_effective": float(
+                    (shifted_inmb > 0).mean()
+                ),
+            }
+        )
+    return pl.DataFrame(rows)
+
+
+# ---------------------------------------------------------------------------
+# PSA precision diagnostics
+# ---------------------------------------------------------------------------
+
+
+def psa_precision_summary(psa_frame: pl.DataFrame) -> pl.DataFrame:
+    """Relative MCSE of the mean incremental QALY plus CEAC worst-case margins."""
+    qaly_values = psa_frame["incremental_qaly"].to_numpy()
+    completed = int(psa_frame.height)
+    sd = float(np.std(qaly_values, ddof=1))
+    mean_abs = abs(float(np.mean(qaly_values)))
+    relative_mcse = sd / np.sqrt(completed) / max(mean_abs, 1e-12)
+    iterations_for_one_percent = int(
+        np.ceil((sd / (0.01 * max(mean_abs, 1e-12))) ** 2)
+    )
+    return pl.DataFrame(
+        [
+            {
+                "completed_iterations": completed,
+                "relative_mcse_mean_incremental_qaly": relative_mcse,
+                "iterations_estimated_for_1pct_relative_mcse_qaly": (
+                    iterations_for_one_percent
+                ),
+                "worst_case_95pct_ceac_margin_at_2500": 1.96
+                * np.sqrt(0.25 / 2_500),
+                "worst_case_95pct_ceac_margin_at_10000": 1.96
+                * np.sqrt(0.25 / 10_000),
+                "rule_of_three_upper_probability_if_zero_events": 3 / completed,
+            }
+        ]
+    )
+
+
+# ---------------------------------------------------------------------------
+# Expected Value of Perfect Information
+# ---------------------------------------------------------------------------
+
+
+def evpi_table(
+    psa_frame: pl.DataFrame, wtp_billion_values: list[float]
+) -> pl.DataFrame:
+    """EVPI at each supplied WTP (in billion IRR/QALY)."""
+    qaly = psa_frame["incremental_qaly"].to_numpy()
+    cost = psa_frame["incremental_cost_irr"].to_numpy()
+    rows: list[dict[str, Any]] = []
+    for wtp_billion in wtp_billion_values:
+        wtp = float(wtp_billion) * 1e9
+        draw_inmb = wtp * qaly - cost
+        mean_inmb = float(np.mean(draw_inmb))
+        evpi_perfect = float(np.mean(np.maximum(draw_inmb, 0.0)))
+        evpi = evpi_perfect - max(mean_inmb, 0.0)
+        rows.append(
+            {
+                "wtp_billion_irr_per_qaly": float(wtp_billion),
+                "mean_inmb_billion_irr": mean_inmb / 1e9,
+                "probability_prophylaxis_cost_effective": float(
+                    (draw_inmb > 0).mean()
+                ),
+                "evpi_billion_irr_per_patient": evpi / 1e9,
+                "evpi_irr_per_patient": evpi,
+            }
+        )
+    return pl.DataFrame(rows)
+
+
+def evpi_grid(psa_frame: pl.DataFrame, wtp_grid: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    """Evaluate EVPI across a dense WTP grid; returns (wtp_grid, evpi_values)."""
+    wtp_grid = np.asarray(wtp_grid, dtype=float)
+    qaly = psa_frame["incremental_qaly"].to_numpy()
+    cost = psa_frame["incremental_cost_irr"].to_numpy()
+    values = np.fromiter(
+        (
+            float(np.mean(np.maximum(wtp * qaly - cost, 0.0)))
+            - max(float(np.mean(wtp * qaly - cost)), 0.0)
+            for wtp in wtp_grid
+        ),
+        dtype=float,
+        count=len(wtp_grid),
+    )
+    return wtp_grid, values
+
+
+def evpi_max(psa_frame: pl.DataFrame, wtp_grid: np.ndarray) -> tuple[float, float]:
+    """Return (max_evpi_irr_per_patient, wtp_billion_at_max) on the supplied grid."""
+    wtp_grid, values = evpi_grid(psa_frame, wtp_grid)
+    max_idx = int(np.argmax(values))
+    return float(values[max_idx]), float(wtp_grid[max_idx]) / 1e9
+
+
+# ---------------------------------------------------------------------------
+# Deterministic break-even and FVIII price policy
+# ---------------------------------------------------------------------------
+
+
+def break_even_factor_price(
+    base_comparison: ComparisonResult,
+    primary_wtp: float,
+    base_factor_price: float,
+) -> dict[str, float]:
+    """Linear-cost approximation of the break-even FVIII unit price at the primary WTP."""
+    base_cost = float(base_comparison.incremental_cost_irr)
+    base_qaly = float(base_comparison.incremental_qaly)
+    required_incremental_cost = float(primary_wtp) * base_qaly
+    break_even_price = base_factor_price * required_incremental_cost / base_cost
+    required_reduction = 1.0 - break_even_price / base_factor_price
+    return {
+        "base_factor_price_irr_per_iu": float(base_factor_price),
+        "primary_wtp_irr_per_qaly": float(primary_wtp),
+        "break_even_factor_price_irr_per_iu": break_even_price,
+        "required_price_reduction_fraction": required_reduction,
+        "required_price_reduction_percent": required_reduction * 100.0,
+    }
+
+
+def factor_price_policy_table(
+    base_comparison: ComparisonResult,
+    base_factor_price: float,
+    primary_wtp: float,
+    reduction_percent: np.ndarray,
+) -> pl.DataFrame:
+    """Deterministic incremental outcomes at each FVIII price reduction percent."""
+    reduction_percent = np.asarray(reduction_percent, dtype=float)
+    base_cost = float(base_comparison.incremental_cost_irr)
+    base_qaly = float(base_comparison.incremental_qaly)
+    rows: list[dict[str, Any]] = []
+    for reduction in reduction_percent:
+        ratio = 1.0 - reduction / 100.0
+        new_price = float(base_factor_price) * ratio
+        new_incremental_cost = base_cost * ratio
+        new_icer = new_incremental_cost / base_qaly
+        new_inmb = float(primary_wtp) * base_qaly - new_incremental_cost
+        rows.append(
+            {
+                "price_reduction_percent": reduction,
+                "factor_price_irr_per_iu": new_price,
+                "incremental_cost_billion_irr": new_incremental_cost / 1e9,
+                "incremental_qaly": base_qaly,
+                "icer_billion_irr_per_qaly": new_icer / 1e9,
+                "inmb_billion_irr_per_patient": new_inmb / 1e9,
+                "cost_effective_at_primary_wtp": float(new_inmb >= 0),
+            }
+        )
+    return pl.DataFrame(rows)
+
+
+def factor_price_psa_table(
+    psa_frame: pl.DataFrame,
+    base_factor_price: float,
+    primary_wtp: float,
+    price_grid: np.ndarray,
+) -> pl.DataFrame:
+    """Per-PSA-draw INMB at each FVIII unit price on the supplied grid."""
+    price_grid = np.asarray(price_grid, dtype=float)
+    qaly = psa_frame["incremental_qaly"].to_numpy()
+    cost = psa_frame["incremental_cost_irr"].to_numpy()
+    rows: list[dict[str, Any]] = []
+    for price in price_grid:
+        ratio = price / float(base_factor_price)
+        adjusted_cost = cost * ratio
+        adjusted_inmb = float(primary_wtp) * qaly - adjusted_cost
+        rows.append(
+            {
+                "factor_price_irr_per_iu": float(price),
+                "price_reduction_percent": 100.0 * (1.0 - price / float(base_factor_price)),
+                "mean_inmb_billion_irr": float(np.mean(adjusted_inmb)) / 1e9,
+                "probability_cost_effective": float(np.mean(adjusted_inmb > 0)),
+            }
+        )
+    return pl.DataFrame(rows)
+
+
+def factor_price_probability_thresholds(
+    factor_price_psa_df: pl.DataFrame, targets: list[float]
+) -> pl.DataFrame:
+    """Maximum FVIII price that achieves each target probability of cost-effectiveness."""
+    rows: list[dict[str, Any]] = []
+    for target in targets:
+        eligible = factor_price_psa_df.filter(
+            pl.col("probability_cost_effective") >= target
+        ).sort("factor_price_irr_per_iu", descending=True)
+        if eligible.height:
+            row = eligible.row(0, named=True)
+            rows.append(
+                {
+                    "target_probability": float(target),
+                    "maximum_price_irr_per_iu": float(row["factor_price_irr_per_iu"]),
+                    "required_price_reduction_percent": float(
+                        row["price_reduction_percent"]
+                    ),
+                }
+            )
+    return pl.DataFrame(rows)
+
+
+# ---------------------------------------------------------------------------
+# OWSA ranking helpers
+# ---------------------------------------------------------------------------
+
+
+def owsa_parameter_ranking(
+    owsa_frame: pl.DataFrame, base_inmb_irr: float, top_n: int = 15
+) -> pl.DataFrame:
+    """One ranked row per complete OWSA parameter with low/high INMB and ICER.
+
+    The ranking follows ``plot_owsa_frame``'s ordering (largest INMB span first).
+    Linked endpoints retain their ``analysis_type``, ``linked_parameter_id`` and
+    ``linked_endpoint_value`` metadata.
+    """
+    base_inmb_irr = float(base_inmb_irr)
+    complete = owsa_frame.filter(pl.col("status") == "complete")
+    ranking = (
+        complete.group_by(["parameter_id", "parameter_description", "unit"])
+        .agg(
+            [
+                pl.col("base_value").first().alias("base_value"),
+                pl.col("endpoint_value")
+                .filter(pl.col("endpoint") == "low")
+                .first()
+                .alias("low_value"),
+                pl.col("incremental_nmb_irr")
+                .filter(pl.col("endpoint") == "low")
+                .first()
+                .alias("inmb_low_irr"),
+                pl.col("icer_irr_per_qaly")
+                .filter(pl.col("endpoint") == "low")
+                .first()
+                .alias("icer_low_irr_per_qaly"),
+                pl.col("endpoint_value")
+                .filter(pl.col("endpoint") == "high")
+                .first()
+                .alias("high_value"),
+                pl.col("incremental_nmb_irr")
+                .filter(pl.col("endpoint") == "high")
+                .first()
+                .alias("inmb_high_irr"),
+                pl.col("icer_irr_per_qaly")
+                .filter(pl.col("endpoint") == "high")
+                .first()
+                .alias("icer_high_irr_per_qaly"),
+                pl.col("analysis_type")
+                .filter(pl.col("endpoint") == "high")
+                .first()
+                .alias("high_endpoint_type"),
+                pl.col("linked_parameter_id")
+                .filter(pl.col("endpoint") == "high")
+                .first()
+                .alias("linked_parameter_id"),
+                pl.col("linked_endpoint_value")
+                .filter(pl.col("endpoint") == "high")
+                .first()
+                .alias("linked_endpoint_value"),
+            ]
+        )
+        .with_columns(
+            [
+                (
+                    pl.max_horizontal("inmb_low_irr", "inmb_high_irr")
+                    - pl.min_horizontal("inmb_low_irr", "inmb_high_irr")
+                ).alias("inmb_range_irr"),
+                (pl.col("inmb_low_irr") - base_inmb_irr).alias("low_change_from_base_irr"),
+                (pl.col("inmb_high_irr") - base_inmb_irr).alias("high_change_from_base_irr"),
+                ((pl.col("inmb_low_irr") > 0) | (pl.col("inmb_high_irr") > 0)).alias(
+                    "any_endpoint_cost_effective"
+                ),
+            ]
+        )
+        .sort("inmb_range_irr", descending=True)
+        .head(top_n)
+        .with_row_index("sensitivity_rank", offset=1)
+    )
+    return ranking.with_columns(
+        [
+            (pl.col("inmb_low_irr") / 1e9).alias("INMB_low_billion_IRR"),
+            (pl.col("inmb_high_irr") / 1e9).alias("INMB_high_billion_IRR"),
+            (pl.col("inmb_range_irr") / 1e9).alias("INMB_range_billion_IRR"),
+            (pl.col("icer_low_irr_per_qaly") / 1e9).alias("ICER_low_billion_IRR_per_QALY"),
+            (pl.col("icer_high_irr_per_qaly") / 1e9).alias(
+                "ICER_high_billion_IRR_per_QALY"
+            ),
+        ]
+    ).select(
+        [
+            "sensitivity_rank",
+            "parameter_id",
+            "parameter_description",
+            "unit",
+            "base_value",
+            "low_value",
+            "high_value",
+            "INMB_low_billion_IRR",
+            "INMB_high_billion_IRR",
+            "INMB_range_billion_IRR",
+            "ICER_low_billion_IRR_per_QALY",
+            "ICER_high_billion_IRR_per_QALY",
+            "any_endpoint_cost_effective",
+            "high_endpoint_type",
+            "linked_parameter_id",
+            "linked_endpoint_value",
+        ]
+    )
+
+
+# ---------------------------------------------------------------------------
+# Runtime and convergence audits
+# ---------------------------------------------------------------------------
+
+
+def runtime_audit_table(
+    production_manifest: dict[str, Any],
+    cpu_manifest: dict[str, Any],
+    cuda_manifest: dict[str, Any],
+) -> pl.DataFrame:
+    """Build the CPU/CUDA benchmark + final PSA runtime comparison table."""
+    return pl.DataFrame(
+        [
+            {
+                "run": "CPU benchmark",
+                "iterations": cpu_manifest["config"]["iterations"],
+                "patients_per_strategy": cpu_manifest["config"]["n_patients"],
+                "worker_processes": cpu_manifest["effective_jobs"],
+                "backend": "CPU JIT process pool",
+                "elapsed_minutes": cpu_manifest["elapsed_seconds_this_session"] / 60.0,
+                "status": cpu_manifest["status"],
+            },
+            {
+                "run": "CUDA benchmark",
+                "iterations": cuda_manifest["config"]["iterations"],
+                "patients_per_strategy": cuda_manifest["config"]["n_patients"],
+                "worker_processes": cuda_manifest["effective_jobs"],
+                "backend": "CUDA FP64 reward kernel",
+                "elapsed_minutes": cuda_manifest["elapsed_seconds_this_session"] / 60.0,
+                "status": cuda_manifest["status"],
+            },
+            {
+                "run": "Final PSA",
+                "iterations": production_manifest["config"]["iterations"],
+                "patients_per_strategy": production_manifest["config"]["n_patients"],
+                "worker_processes": production_manifest["effective_jobs"],
+                "backend": "CPU JIT process pool",
+                "elapsed_minutes": (
+                    production_manifest["elapsed_seconds_this_session"] / 60.0
+                ),
+                "status": production_manifest["status"],
+            },
+        ]
+    )
+
+
+def monte_carlo_convergence_table(convergence_records: list[dict[str, Any]]) -> pl.DataFrame:
+    """Materialise the deterministic Monte Carlo convergence record list."""
+    return pl.DataFrame(convergence_records)
+
